@@ -78,13 +78,32 @@ export async function POST(request: NextRequest) {
       // 4. จัดการ User ในระบบ Auth
       const { data: userData } = await supabaseAdmin.auth.admin.listUsers()
       let existingUser = userData?.users.find(u => u.email === email)
-      
-      const metadata = { 
-        student_id: username, 
-        full_name: fullName, 
-        avatar_url: avatarUrl,
-        department: memberInfo.department, // เก็บฝ่ายไว้ใน metadata ด้วยเพื่อความรวดเร็วตอนแสดงผล
-        role: memberInfo.role
+
+      // ตรวจสอบว่า user มีรูป custom (อัปโหลดเอง) อยู่แล้วหรือไม่
+      // ถ้ามี → ใช้รูป custom นั้นต่อไป อย่า overwrite ด้วยรูปจาก LMS
+      let finalAvatarUrl = avatarUrl
+
+      if (existingUser) {
+        const { data: dbUser } = await supabaseAdmin
+          .from('users')
+          .select('avatar_url')
+          .eq('id', existingUser.id)
+          .single()
+
+        // รูป custom จะมาจาก Supabase Storage (ไม่มี lms.psu.ac.th ใน URL)
+        const storedAvatar = dbUser?.avatar_url
+        if (storedAvatar && !storedAvatar.includes('lms.psu.ac.th')) {
+          finalAvatarUrl = storedAvatar
+        }
+      }
+
+      const metadata = {
+        student_id:     username,
+        full_name:      fullName,
+        avatar_url:     finalAvatarUrl,
+        department:     memberInfo.department,
+        role:           memberInfo.role,
+        lms_avatar_url: avatarUrl,
       }
 
       if (!existingUser) {
@@ -93,20 +112,20 @@ export async function POST(request: NextRequest) {
         })
         existingUser = newUser.user || undefined
       } else {
-        await supabaseAdmin.auth.admin.updateUserById(existingUser.id, { 
-          password, user_metadata: metadata 
+        await supabaseAdmin.auth.admin.updateUserById(existingUser.id, {
+          password, user_metadata: metadata
         })
       }
 
       // 🌟 5. บันทึกข้อมูลลงตาราง public.users ใน Database ด้วย!
       if (existingUser) {
         await supabaseAdmin.from('users').upsert({
-          id: existingUser.id,
+          id:         existingUser.id,
           student_id: username,
-          full_name: fullName,
-          role: memberInfo.role,
+          full_name:  fullName,
+          role:       memberInfo.role,
           department: memberInfo.department,
-          avatar_url: avatarUrl,   // ✅ เพิ่มตรงนี้
+          avatar_url: finalAvatarUrl,
         })
       }
 
