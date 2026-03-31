@@ -311,7 +311,7 @@ export default function CalendarPage() {
   return (
     <div className="flex min-h-screen bg-gray-50 text-gray-900">
       <Sidebar user={user} activePage="calendar" onLogout={handleLogout} onUserUpdated={handleUserUpdated} />
-      <MobileNav activePage="calendar" />
+      <MobileNav activePage="calendar" user={user} onUserUpdated={handleUserUpdated} />
 
       {/* Close overflow when clicking outside */}
       {showOverflow && (
@@ -322,75 +322,58 @@ export default function CalendarPage() {
 
         {/* ── Header ──────────────────────────────────────────────────── */}
         <header className="bg-white border-b border-gray-200 sticky top-0 z-20">
+          <div className="flex items-center gap-2 px-4 md:px-6 py-3">
 
-          {/* ── Row 1: Month nav + primary actions ── */}
-          <div className="flex items-center justify-between px-4 md:px-6 py-3 gap-2">
-
-            {/* Left: month navigation */}
-            <div className="flex items-center gap-0.5 min-w-0">
+            {/* Month navigation — left */}
+            <div className="flex items-center gap-0.5">
               <button onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
-                className="p-2 hover:bg-gray-100 rounded-xl transition shrink-0">
+                className="p-2 hover:bg-gray-100 rounded-xl transition">
                 <ChevronLeft size={18} />
               </button>
-              <button
-                onClick={() => setCurrentMonth(new Date())}
-                className="flex flex-col items-center px-2 py-1 rounded-xl hover:bg-gray-50 transition min-w-0"
-              >
-                <span className="text-[11px] font-bold text-blue-500 uppercase tracking-widest leading-none">
+              <button onClick={() => setCurrentMonth(new Date())}
+                className="flex flex-col items-center px-1.5 py-0.5 rounded-xl hover:bg-gray-50 transition">
+                <span className="text-[10px] font-bold text-blue-500 uppercase tracking-widest leading-none">
                   {format(currentMonth, 'yyyy')}
                 </span>
-                <span className="text-lg md:text-xl font-black text-gray-900 leading-tight whitespace-nowrap">
+                <span className="text-base md:text-lg font-black text-gray-900 leading-tight whitespace-nowrap">
                   {format(currentMonth, 'MMMM', { locale: th })}
                 </span>
               </button>
               <button onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
-                className="p-2 hover:bg-gray-100 rounded-xl transition shrink-0">
+                className="p-2 hover:bg-gray-100 rounded-xl transition">
                 <ChevronRight size={18} />
-              </button>
-
-              {/* Today pill — desktop only */}
-              <button onClick={() => setCurrentMonth(new Date())}
-                className="hidden md:inline-flex items-center text-xs font-bold text-blue-600 hover:bg-blue-50 px-3 py-1.5 rounded-full border border-blue-200 transition ml-2 shrink-0">
-                วันนี้
               </button>
             </div>
 
-            {/* Right: always-visible controls */}
-            <div className="flex items-center gap-2 shrink-0">
+            {/* Spacer */}
+            <div className="flex-1" />
 
-              {/* View toggle */}
-              <div className="flex items-center bg-gray-100 rounded-xl p-1 gap-0.5">
-                <button onClick={() => setViewMode('month')} title="มุมมองเดือน"
-                  className={`p-2 rounded-lg transition ${viewMode === 'month' ? 'bg-white shadow-sm text-blue-600' : 'text-gray-400 hover:text-gray-600'}`}>
+            {/* ── Mobile: view toggle + overflow ── */}
+            <div className="flex md:hidden items-center gap-2">
+              <div className="flex items-center bg-gray-100 rounded-xl p-1">
+                <button onClick={() => setViewMode('month')}
+                  className={`p-1.5 rounded-lg transition ${viewMode === 'month' ? 'bg-white shadow-sm text-blue-600' : 'text-gray-400'}`}>
                   <Grid3X3 size={15} />
                 </button>
-                <button onClick={() => setViewMode('agenda')} title="มุมมองรายการ"
-                  className={`p-2 rounded-lg transition ${viewMode === 'agenda' ? 'bg-white shadow-sm text-blue-600' : 'text-gray-400 hover:text-gray-600'}`}>
+                <button onClick={() => setViewMode('agenda')}
+                  className={`p-1.5 rounded-lg transition ${viewMode === 'agenda' ? 'bg-white shadow-sm text-blue-600' : 'text-gray-400'}`}>
                   <List size={15} />
                 </button>
               </div>
 
-              {/* Overflow menu button — mobile only */}
-              <div className="relative md:hidden">
-                <button
-                  onClick={() => setShowOverflow(!showOverflow)}
-                  className={`p-2 rounded-xl border transition ${showOverflow ? 'bg-gray-100 border-gray-300' : 'bg-white border-gray-200 hover:bg-gray-50'}`}
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" className="text-gray-600">
+              <div className="relative">
+                <button onClick={() => setShowOverflow(!showOverflow)}
+                  className={`p-2 rounded-xl border transition ${showOverflow ? 'bg-gray-100 border-gray-300' : 'bg-white border-gray-200'}`}>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" className="text-gray-600">
                     <circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/>
                   </svg>
                 </button>
-
-                {/* Dropdown */}
                 {showOverflow && (
                   <div className="absolute right-0 top-full mt-2 bg-white rounded-2xl shadow-xl border border-gray-100 p-2 w-52 z-50">
-                    {/* Today */}
                     <button onClick={() => { setCurrentMonth(new Date()); setShowOverflow(false) }}
                       className="flex items-center gap-2.5 w-full px-3 py-2.5 rounded-xl hover:bg-gray-50 transition text-sm font-medium text-gray-700">
                       <CalendarIcon size={15} className="text-blue-500" /> วันนี้
                     </button>
-
-                    {/* Task toggle */}
                     {myProjectIds.length > 0 && (
                       <button onClick={() => { setShowTasks(!showTasks); setShowOverflow(false) }}
                         className={`flex items-center gap-2.5 w-full px-3 py-2.5 rounded-xl transition text-sm font-medium ${showTasks ? 'bg-amber-50 text-amber-700' : 'hover:bg-gray-50 text-gray-700'}`}>
@@ -398,21 +381,14 @@ export default function CalendarPage() {
                         {showTasks ? 'ซ่อนงานเตรียม' : 'แสดงงานเตรียม'}
                       </button>
                     )}
-
                     <div className="h-px bg-gray-100 my-1.5" />
-
-                    {/* Export */}
                     <button onClick={() => { exportToICS(events); setShowOverflow(false) }}
                       className="flex items-center gap-2.5 w-full px-3 py-2.5 rounded-xl hover:bg-gray-50 transition text-sm font-medium text-gray-700">
                       <Download size={15} className="text-gray-400" /> ส่งออก .ics
                     </button>
-
-                    {/* Google Calendar */}
                     <div className="px-3 py-2">
                       <GoogleCalendarButton compact />
                     </div>
-
-                    {/* Admin: CSV */}
                     {isAdmin && (
                       <>
                         <div className="h-px bg-gray-100 my-1.5" />
@@ -426,57 +402,54 @@ export default function CalendarPage() {
                 )}
               </div>
 
-              {/* Desktop secondary actions */}
-              <div className="hidden md:flex items-center gap-2">
-                {myProjectIds.length > 0 && (
-                  <button onClick={() => setShowTasks(!showTasks)}
-                    className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border transition ${showTasks ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-gray-50 text-gray-400 border-gray-200 hover:bg-gray-100'}`}>
-                    <ListTodo size={13} /> งานเตรียม
-                  </button>
-                )}
-                <button onClick={() => exportToICS(events)}
-                  className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-gray-600 hover:bg-gray-100 rounded-xl transition border border-gray-200">
-                  <Download size={14} /> ส่งออก
+              {isAdmin && (
+                <button onClick={openAddModal}
+                  className="flex items-center gap-1 px-3 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 active:scale-95 transition text-sm font-bold shadow-sm">
+                  <Plus size={16} />
                 </button>
-                <GoogleCalendarButton />
-                {isAdmin && (
+              )}
+            </div>
+
+            {/* ── Desktop: full action bar ── */}
+            <div className="hidden md:flex items-center gap-2">
+              <button onClick={() => setCurrentMonth(new Date())}
+                className="text-xs font-bold text-blue-600 hover:bg-blue-50 px-3 py-1.5 rounded-full border border-blue-200 transition">
+                วันนี้
+              </button>
+              <div className="flex items-center bg-gray-100 rounded-xl p-1">
+                <button onClick={() => setViewMode('month')}
+                  className={`p-2 rounded-lg transition ${viewMode === 'month' ? 'bg-white shadow-sm text-blue-600' : 'text-gray-400 hover:text-gray-600'}`}>
+                  <Grid3X3 size={15} />
+                </button>
+                <button onClick={() => setViewMode('agenda')}
+                  className={`p-2 rounded-lg transition ${viewMode === 'agenda' ? 'bg-white shadow-sm text-blue-600' : 'text-gray-400 hover:text-gray-600'}`}>
+                  <List size={15} />
+                </button>
+              </div>
+              {myProjectIds.length > 0 && (
+                <button onClick={() => setShowTasks(!showTasks)}
+                  className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border transition ${showTasks ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-gray-50 text-gray-400 border-gray-200 hover:bg-gray-100'}`}>
+                  <ListTodo size={13} /> งานเตรียม
+                </button>
+              )}
+              <button onClick={() => exportToICS(events)}
+                className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-gray-600 hover:bg-gray-100 rounded-xl transition border border-gray-200">
+                <Download size={14} /> ส่งออก
+              </button>
+              <GoogleCalendarButton />
+              {isAdmin && (
+                <>
                   <button onClick={() => setIsCsvOpen(true)}
                     className="flex items-center gap-1.5 px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl transition text-xs font-bold border border-gray-200">
                     <Upload size={14} /> CSV
                   </button>
-                )}
-              </div>
-
-              {/* Create button — always visible for admin */}
-              {isAdmin && (
-                <button onClick={openAddModal}
-                  className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 active:scale-95 transition text-sm font-bold shadow-sm">
-                  <Plus size={16} />
-                  <span className="hidden sm:inline">สร้าง</span>
-                </button>
+                  <button onClick={openAddModal}
+                    className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 active:scale-95 transition text-sm font-bold shadow-sm">
+                    <Plus size={16} /> สร้าง
+                  </button>
+                </>
               )}
             </div>
-          </div>
-
-          {/* ── Row 2: event count strip — mobile only ── */}
-          <div className="md:hidden flex items-center justify-between px-4 pb-2.5 gap-3">
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-gray-400 font-medium">
-                {allDisplayEvents.length} กิจกรรม
-              </span>
-              {showTasks && taskEvents.length > 0 && (
-                <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
-                  +{taskEvents.length} งานเตรียม
-                </span>
-              )}
-            </div>
-            {/* Today quick jump — mobile */}
-            {!isSameDay(currentMonth, new Date()) && (
-              <button onClick={() => setCurrentMonth(new Date())}
-                className="text-[11px] font-bold text-blue-600 hover:underline">
-                กลับวันนี้
-              </button>
-            )}
           </div>
         </header>
 
