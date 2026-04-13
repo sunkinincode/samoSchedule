@@ -1,6 +1,6 @@
 'use client'
 import { useState } from 'react'
-import { Calendar as CalendarIcon, FolderKanban, TrendingUp, User as UserIcon, LogOut, Pencil, X, Camera, Loader2 } from 'lucide-react'
+import { Calendar as CalendarIcon, FolderKanban, TrendingUp, FileText, User as UserIcon, LogOut, Pencil, X, Camera, Loader2 } from 'lucide-react'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 
@@ -92,6 +92,15 @@ export default function MobileNav({ activePage, user, onUserUpdated }: MobileNav
             }`}>
             <FolderKanban size={22} strokeWidth={activePage === 'projects' ? 2.5 : 1.8} />
             <span className="text-[10px] font-semibold">โครงการ</span>
+          </Link>
+
+          {/* Proposal tab */}
+          <Link href="/proposal-beta"
+            className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5 transition-colors ${
+              activePage === 'proposal' ? 'text-blue-600' : 'text-gray-400'
+            }`}>
+            <FileText size={22} strokeWidth={activePage === 'proposal' ? 2.5 : 1.8} />
+            <span className="text-[10px] font-semibold">Proposal</span>
           </Link>
 
           {/* Profile tab */}

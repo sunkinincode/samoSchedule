@@ -318,7 +318,7 @@ export default function CalendarPage() {
         <div className="fixed inset-0 z-40" onClick={() => setShowOverflow(false)} />
       )}
 
-      <main className="flex-1 overflow-y-auto w-full relative pb-20 md:pb-0">
+      <main className="flex-1 w-full relative pb-20 md:pb-0 flex flex-col h-screen overflow-hidden">
 
         <header className="bg-white border-b border-gray-200 sticky top-0 z-20">
           <div className="flex items-center gap-2 px-4 md:px-6 py-3">
@@ -452,14 +452,14 @@ export default function CalendarPage() {
           </div>
         </div>
 
-        <section className="p-3 md:p-6">
+        <section className="p-3 md:p-6 flex-1 min-h-0">
           {loading ? (
             <div className="flex items-center justify-center h-64">
               <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
             </div>
 
           ) : viewMode === 'agenda' ? (
-            <div className="max-w-2xl mx-auto space-y-5">
+            <div className="max-w-2xl mx-auto space-y-5 h-full overflow-y-auto pr-1">
               {Object.keys(agendaByDate).length === 0 ? (
                 <div className="text-center py-20 text-gray-400">
                   <CalendarIcon size={40} className="mx-auto mb-3 opacity-30" />
@@ -525,13 +525,13 @@ export default function CalendarPage() {
             </div>
 
           ) : (
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden h-full flex flex-col">
               <div className="grid grid-cols-7 border-b border-gray-100 bg-gray-50/80">
                 {['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'].map(d => (
                   <div key={d} className="py-2.5 text-center text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest">{d}</div>
                 ))}
               </div>
-              <div className="grid grid-cols-7 auto-rows-[72px] md:auto-rows-[120px]">
+              <div className="grid grid-cols-7 grid-rows-6 flex-1 min-h-0">
                 {calendarDays.map((day, idx) => {
                   const dayEvents = getEventsForDay(day)
                   const isCurrentMonth = isSameMonth(day, currentMonth)
