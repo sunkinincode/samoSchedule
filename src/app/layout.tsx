@@ -24,6 +24,7 @@ export default function RootLayout({
     <html
       lang="th"
       className={`${inter.variable} h-full antialiased`}
+      data-scroll-behavior="smooth"
     >
       <head>
         {/* Google Sans font */}

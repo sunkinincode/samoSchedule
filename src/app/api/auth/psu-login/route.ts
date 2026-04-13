@@ -4,7 +4,6 @@ import { cookies } from 'next/headers'
 import { NextRequest, NextResponse } from 'next/server'
 
 const ALLOWED_MEMBERS: Record<string, { role: string, department: string }> = {
-  // --- ทีมบริหาร (Admin) สามารถสร้างกิจกรรมได้ ---
   '6710210395': { role: 'admin', department: 'นายกสโมสร' },
   '6710210374': { role: 'admin', department: 'อุปนายกฝ่ายบริหาร' },
   '6710210521': { role: 'admin', department: 'เหรัญญิก' },
@@ -12,8 +11,6 @@ const ALLOWED_MEMBERS: Record<string, { role: string, department: string }> = {
   '6810210435': { role: 'admin', department: 'เลขานุการ' },
   '6810210750': { role: 'admin', department: 'อุปนายกฝ่ายกิจการภายใน' },
   '6810210889': { role: 'admin', department: 'อุปนายกฝ่ายกิจการภายนอก' },
-
-  // --- ทีมประธานฝ่าย (Support/Member) ดูได้อย่างเดียว ---
   '6810210013': { role: 'admin', department: 'ประธานฝ่ายประชาสัมพันธ์' },
   '6810210076': { role: 'member', department: 'ประธานฝ่ายวิชาการ' },
   '6810210148': { role: 'member', department: 'ประธานฝ่ายสวัสดิการ' },
@@ -42,16 +39,35 @@ export async function POST(request: NextRequest) {
     const { username, password } = await request.json()
     const email = `${username}@psu.ac.th`
 
-    // 🌟 2. ดักไว้ก่อนเลย ถ้าไม่อยู่ใน 22 คนนี้ ให้เตะออกทันที
+    // 1. ดักสิทธิ์เข้าใช้งาน
     const memberInfo = ALLOWED_MEMBERS[username]
     if (!memberInfo) {
-      return NextResponse.json(
-        { success: false, message: 'คุณไม่มีสิทธิ์เข้าใช้งานระบบของสโมสรนักศึกษา' },
-        { status: 403 }
-      )
+      return NextResponse.json({ success: false, message: 'คุณไม่มีสิทธิ์เข้าใช้งานระบบของสโมสรนักศึกษา' }, { status: 403 })
     }
 
-    // 3. ตรวจสอบกับ PSU LMS
+    // เตรียม Supabase Client สำหรับจัดการ Session
+    const cookieStore = await cookies()
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          get(name: string) { return cookieStore.get(name)?.value },
+          set(name: string, value: string, options: CookieOptions) { cookieStore.set({ name, value, ...options }) },
+          remove(name: string, options: CookieOptions) { cookieStore.set({ name, value: '', ...options }) },
+        },
+      }
+    )
+
+    // 🚀 OPTIMIZATION 1: ทางลัด (Fast Path)
+    // ลองเข้าสู่ระบบผ่าน Supabase ตรงๆ ก่อน ถ้าสำเร็จแปลว่าเคยล็อกอินแล้วและรหัสเดิม = ข้าม API Moodle ไปเลย!
+    const { data: fastLogin, error: fastLoginError } = await supabase.auth.signInWithPassword({ email, password })
+    if (!fastLoginError && fastLogin.session) {
+      return NextResponse.json({ success: true }) 
+    }
+
+    // 🚀 OPTIMIZATION 2: ทางหลัก (Fallback) 
+    // กรณีผู้ใช้ใหม่ หรือไปเปลี่ยนรหัสผ่านที่ Moodle มา ถึงจะยอมวิ่งไปเช็ก API ของมอ
     const psuRes = await fetch('https://lms.psu.ac.th/login/token.php', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -75,26 +91,12 @@ export async function POST(request: NextRequest) {
         console.warn("ดึงข้อมูลโปรไฟล์ไม่สำเร็จ:", err)
       }
 
-      // 4. จัดการ User ในระบบ Auth
-      const { data: userData } = await supabaseAdmin.auth.admin.listUsers()
-      let existingUser = userData?.users.find(u => u.email === email)
+      // 🚀 OPTIMIZATION 3: เลิกใช้ listUsers() (ช้ามาก) เปลี่ยนมา Query หาจากตารางตรงๆ
+      const { data: dbUser } = await supabaseAdmin.from('users').select('id, avatar_url').eq('student_id', username).single()
 
-      // ตรวจสอบว่า user มีรูป custom (อัปโหลดเอง) อยู่แล้วหรือไม่
-      // ถ้ามี → ใช้รูป custom นั้นต่อไป อย่า overwrite ด้วยรูปจาก LMS
       let finalAvatarUrl = avatarUrl
-
-      if (existingUser) {
-        const { data: dbUser } = await supabaseAdmin
-          .from('users')
-          .select('avatar_url')
-          .eq('id', existingUser.id)
-          .single()
-
-        // รูป custom จะมาจาก Supabase Storage (ไม่มี lms.psu.ac.th ใน URL)
-        const storedAvatar = dbUser?.avatar_url
-        if (storedAvatar && !storedAvatar.includes('lms.psu.ac.th')) {
-          finalAvatarUrl = storedAvatar
-        }
+      if (dbUser?.avatar_url && !dbUser.avatar_url.includes('lms.psu.ac.th')) {
+        finalAvatarUrl = dbUser.avatar_url
       }
 
       const metadata = {
@@ -106,21 +108,24 @@ export async function POST(request: NextRequest) {
         lms_avatar_url: avatarUrl,
       }
 
-      if (!existingUser) {
-        const { data: newUser } = await supabaseAdmin.auth.admin.createUser({
+      let userId = dbUser?.id;
+
+      if (userId) {
+        // อัปเดตรหัสผ่านและข้อมูลใน Auth
+        await supabaseAdmin.auth.admin.updateUserById(userId, { password, user_metadata: metadata })
+      } else {
+        // สร้างผู้ใช้ใหม่
+        const { data: newUser, error: createErr } = await supabaseAdmin.auth.admin.createUser({
           email, password, email_confirm: true, user_metadata: metadata
         })
-        existingUser = newUser.user || undefined
-      } else {
-        await supabaseAdmin.auth.admin.updateUserById(existingUser.id, {
-          password, user_metadata: metadata
-        })
+        if (createErr) throw createErr;
+        userId = newUser.user.id;
       }
 
-      // 🌟 5. บันทึกข้อมูลลงตาราง public.users ใน Database ด้วย!
-      if (existingUser) {
+      // บันทึกข้อมูลลงตาราง public.users
+      if (userId) {
         await supabaseAdmin.from('users').upsert({
-          id:         existingUser.id,
+          id:         userId,
           student_id: username,
           full_name:  fullName,
           role:       memberInfo.role,
@@ -129,24 +134,9 @@ export async function POST(request: NextRequest) {
         })
       }
 
-      // 6. สร้าง Session
-      const cookieStore = await cookies()
-      const response = NextResponse.json({ success: true })
-      
-      const supabase = createServerClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-        {
-          cookies: {
-            get(name: string) { return cookieStore.get(name)?.value },
-            set(name: string, value: string, options: CookieOptions) { cookieStore.set({ name, value, ...options }) },
-            remove(name: string, options: CookieOptions) { cookieStore.set({ name, value: '', ...options }) },
-          },
-        }
-      )
-
+      // สร้าง Session
       await supabase.auth.signInWithPassword({ email, password })
-      return response
+      return NextResponse.json({ success: true })
     }
 
     return NextResponse.json({ success: false, message: 'รหัสผ่าน LMS ไม่ถูกต้อง' }, { status: 401 })

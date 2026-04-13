@@ -1,80 +1,8 @@
 import Link from 'next/link'
 import {
-  Calendar, FolderKanban, Users, Download,
-  ArrowRight, ChevronRight, CalendarCheck,
-  ListTodo, RefreshCw, Upload, UserCircle2,
-  Bell, Shield, Sparkles,
+  Calendar, ArrowRight, ChevronRight,
+  RefreshCw, Bell, Shield, Sparkles, Atom
 } from 'lucide-react'
-
-// ─── Feature data ─────────────────────────────────────────────────────────────
-const features = [
-  {
-    icon: <Calendar size={24} />,
-    color: 'blue',
-    title: 'ปฏิทินกิจกรรม',
-    desc: 'ดูกิจกรรมทั้งหมดของสโมสรฯ ในมุมมองรายเดือนหรือรายการ สีแยกตามโครงการ ไม่พลาดทุกงาน',
-  },
-  {
-    icon: <FolderKanban size={24} />,
-    color: 'indigo',
-    title: 'บริหารโครงการ',
-    desc: 'ดูแลโครงการที่รับผิดชอบ แยกแยะงานเตรียมและวันงานจริง พร้อม QR Line กลุ่ม',
-  },
-  {
-    icon: <CalendarCheck size={24} />,
-    color: 'emerald',
-    title: 'วันงานจริง',
-    desc: 'เพิ่มวันจัดงานให้ปรากฏบนปฏิทินของทุกคนในสโมสรฯ อัปเดตแบบ real-time',
-  },
-  {
-    icon: <ListTodo size={24} />,
-    color: 'amber',
-    title: 'งานเตรียม',
-    desc: 'จัดการสิ่งที่ต้องเตรียมก่อนงาน เห็นเฉพาะผู้ดูแลโครงการนั้น ไม่รกปฏิทินทั่วไป',
-  },
-  {
-    icon: <RefreshCw size={24} />,
-    color: 'cyan',
-    title: 'Sync Google Calendar',
-    desc: 'เชื่อมต่อ Google Calendar ส่วนตัว กิจกรรมทั้งหมดจะ sync ไปยังปฏิทิน Google ของคุณ',
-  },
-  {
-    icon: <Upload size={24} />,
-    color: 'purple',
-    title: 'นำเข้าจาก CSV',
-    desc: 'เพิ่มกิจกรรมจำนวนมากได้ครั้งเดียวผ่านไฟล์ CSV ประหยัดเวลาในการป้อนข้อมูล',
-  },
-  {
-    icon: <Users size={24} />,
-    color: 'rose',
-    title: 'ทีมผู้ดูแล',
-    desc: 'ดูโปรไฟล์ผู้ดูแลทุกคนในโครงการ ฝ่าย ตำแหน่ง และโครงการที่รับผิดชอบ',
-  },
-  {
-    icon: <Download size={24} />,
-    color: 'teal',
-    title: 'ส่งออก .ics',
-    desc: 'Export กิจกรรมทั้งหมดเป็นไฟล์ .ics นำเข้า Apple Calendar, Outlook ได้ทันที',
-  },
-  {
-    icon: <UserCircle2 size={24} />,
-    color: 'orange',
-    title: 'โปรไฟล์ส่วนตัว',
-    desc: 'ล็อกอินด้วยบัญชี PSU LMS อัปโหลดรูปโปรไฟล์ของตัวเอง ระบบจดจำเสมอ',
-  },
-]
-
-const colorMap: Record<string, { bg: string; icon: string; ring: string }> = {
-  blue:   { bg: 'bg-blue-50',   icon: 'text-blue-600',   ring: 'ring-blue-100' },
-  indigo: { bg: 'bg-indigo-50', icon: 'text-indigo-600', ring: 'ring-indigo-100' },
-  emerald:{ bg: 'bg-emerald-50',icon: 'text-emerald-600',ring: 'ring-emerald-100' },
-  amber:  { bg: 'bg-amber-50',  icon: 'text-amber-600',  ring: 'ring-amber-100' },
-  cyan:   { bg: 'bg-cyan-50',   icon: 'text-cyan-600',   ring: 'ring-cyan-100' },
-  purple: { bg: 'bg-purple-50', icon: 'text-purple-600', ring: 'ring-purple-100' },
-  rose:   { bg: 'bg-rose-50',   icon: 'text-rose-600',   ring: 'ring-rose-100' },
-  teal:   { bg: 'bg-teal-50',   icon: 'text-teal-600',   ring: 'ring-teal-100' },
-  orange: { bg: 'bg-orange-50', icon: 'text-orange-600', ring: 'ring-orange-100' },
-}
 
 // ─── Flow steps ───────────────────────────────────────────────────────────────
 const steps = [
@@ -84,7 +12,6 @@ const steps = [
   { n: '04', title: 'ทุกคนเห็นพร้อมกัน', desc: 'วันงานจริงปรากฏบนปฏิทินของทุกคนในสโมสรฯ ทันที' },
 ]
 
-// ─────────────────────────────────────────────────────────────────────────────
 export default function LandingPage() {
   return (
     <div className="min-h-screen bg-white text-gray-900" style={{ fontFamily: "'Google Sans', 'Noto Sans Thai', sans-serif" }}>
@@ -92,14 +19,9 @@ export default function LandingPage() {
       {/* ── Navbar ────────────────────────────────────────────────────────── */}
       <nav className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-xl border-b border-gray-100">
         <div className="max-w-6xl mx-auto px-5 py-3.5 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            {/* Science beaker icon */}
-            <div className="w-9 h-9 bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl flex items-center justify-center shadow-sm shadow-blue-200">
-              <svg viewBox="0 0 24 24" fill="none" className="w-5 h-5" stroke="white" strokeWidth="2">
-                <path d="M9 3h6M9 3v8L5.5 17A2 2 0 007.3 20h9.4a2 2 0 001.8-3L15 11V3" strokeLinecap="round" strokeLinejoin="round"/>
-                <circle cx="9.5" cy="15.5" r="1" fill="white" stroke="none"/>
-                <circle cx="13" cy="17" r="0.8" fill="white" stroke="none"/>
-              </svg>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-amber-50 border border-amber-200 shadow-sm">
+              <Atom size={22} className="text-amber-600" />
             </div>
             <div>
               <p className="text-sm font-bold text-gray-900 leading-none">Samo Schedule</p>
@@ -117,18 +39,15 @@ export default function LandingPage() {
 
       {/* ── Hero ──────────────────────────────────────────────────────────── */}
       <section className="relative pt-28 pb-20 md:pt-36 md:pb-28 overflow-hidden">
-        {/* Background blobs */}
         <div className="absolute inset-0 -z-10 overflow-hidden">
           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[600px] bg-gradient-to-b from-blue-50 to-transparent rounded-full blur-3xl opacity-70" />
           <div className="absolute top-20 right-0 w-72 h-72 bg-indigo-100 rounded-full blur-3xl opacity-40" />
           <div className="absolute top-40 left-0 w-56 h-56 bg-cyan-100 rounded-full blur-3xl opacity-40" />
-          {/* Grid pattern */}
           <div className="absolute inset-0 opacity-[0.03]"
             style={{ backgroundImage: 'linear-gradient(#1d4ed8 1px, transparent 1px), linear-gradient(90deg, #1d4ed8 1px, transparent 1px)', backgroundSize: '40px 40px' }} />
         </div>
 
         <div className="max-w-4xl mx-auto px-5 text-center">
-          {/* Eyebrow */}
           <div className="inline-flex items-center gap-2 bg-blue-50 border border-blue-200 text-blue-700 text-xs font-semibold px-4 py-1.5 rounded-full mb-6">
             <Sparkles size={12} />
             สโมสรนักศึกษาคณะวิทยาศาสตร์ มหาวิทยาลัยสงขลานครินทร์
@@ -161,7 +80,6 @@ export default function LandingPage() {
             </Link>
           </div>
 
-          {/* Trust strip */}
           <div className="mt-12 flex items-center justify-center gap-6 flex-wrap">
             {[
               { icon: <Shield size={14} />, text: 'PSU LMS Authentication' },
@@ -180,7 +98,6 @@ export default function LandingPage() {
       {/* ── Calendar Preview mockup ───────────────────────────────────────── */}
       <section className="max-w-5xl mx-auto px-5 pb-20">
         <div className="bg-gradient-to-b from-gray-50 to-white rounded-3xl border border-gray-200 overflow-hidden shadow-xl shadow-gray-100">
-          {/* Browser bar */}
           <div className="flex items-center gap-2 px-5 py-3.5 border-b border-gray-200 bg-white">
             <div className="flex gap-1.5">
               <div className="w-3 h-3 rounded-full bg-red-400" />
@@ -192,7 +109,6 @@ export default function LandingPage() {
             </div>
           </div>
 
-          {/* Fake calendar grid */}
           <div className="p-5">
             <div className="flex items-center justify-between mb-4">
               <div>
@@ -207,14 +123,12 @@ export default function LandingPage() {
               </div>
             </div>
 
-            {/* Day headers */}
             <div className="grid grid-cols-7 mb-1">
               {['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'].map(d => (
                 <div key={d} className="text-center text-[10px] font-black text-gray-400 uppercase tracking-widest py-1.5">{d}</div>
               ))}
             </div>
 
-            {/* Calendar days */}
             <div className="grid grid-cols-7 gap-px bg-gray-100 rounded-2xl overflow-hidden">
               {[
                 { d: 31, dim: true,  events: [] },
@@ -251,30 +165,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── Features grid ─────────────────────────────────────────────────── */}
-      <section className="max-w-6xl mx-auto px-5 py-16">
-        <div className="text-center mb-12">
-          <p className="text-sm font-bold text-blue-600 uppercase tracking-widest mb-2">ฟีเจอร์ทั้งหมด</p>
-          <h2 className="text-3xl md:text-4xl font-bold text-gray-900">ครบทุกความต้องการ<br className="hidden md:block"/> ของทีมงานสโมสรฯ</h2>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {features.map(f => {
-            const c = colorMap[f.color]
-            return (
-              <div key={f.title}
-                className={`group p-5 rounded-2xl border border-gray-100 hover:border-gray-200 hover:shadow-md transition-all bg-white`}>
-                <div className={`w-11 h-11 ${c.bg} ${c.icon} rounded-2xl flex items-center justify-center mb-4 ring-4 ${c.ring} ring-offset-0`}>
-                  {f.icon}
-                </div>
-                <h3 className="text-base font-bold text-gray-900 mb-1.5">{f.title}</h3>
-                <p className="text-sm text-gray-500 leading-relaxed">{f.desc}</p>
-              </div>
-            )
-          })}
-        </div>
-      </section>
-
       {/* ── How it works ──────────────────────────────────────────────────── */}
       <section className="bg-gray-50 py-20">
         <div className="max-w-5xl mx-auto px-5">
@@ -284,9 +174,7 @@ export default function LandingPage() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 relative">
-            {/* Connecting line (desktop) */}
             <div className="hidden md:block absolute top-10 left-[12.5%] right-[12.5%] h-px bg-gradient-to-r from-blue-200 via-indigo-200 to-blue-200" />
-
             {steps.map((s, i) => (
               <div key={s.n} className="relative flex flex-col items-center text-center">
                 <div className="w-20 h-20 bg-white rounded-2xl border-2 border-blue-200 flex flex-col items-center justify-center mb-4 shadow-sm relative z-10">
@@ -304,7 +192,6 @@ export default function LandingPage() {
       {/* ── Access control section ────────────────────────────────────────── */}
       <section className="max-w-5xl mx-auto px-5 py-20">
         <div className="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-3xl p-8 md:p-12 text-white overflow-hidden relative">
-          {/* Decorative circles */}
           <div className="absolute -top-16 -right-16 w-64 h-64 bg-white/5 rounded-full" />
           <div className="absolute -bottom-20 -left-8 w-56 h-56 bg-white/5 rounded-full" />
 
@@ -367,9 +254,7 @@ export default function LandingPage() {
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-3 text-xs text-gray-400">
           <div className="flex items-center gap-2">
             <div className="w-6 h-6 bg-blue-600 rounded-lg flex items-center justify-center">
-              <svg viewBox="0 0 24 24" fill="none" className="w-3.5 h-3.5" stroke="white" strokeWidth="2">
-                <path d="M9 3h6M9 3v8L5.5 17A2 2 0 007.3 20h9.4a2 2 0 001.8-3L15 11V3" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
+              <Atom className="w-3.5 h-3.5 text-white" />
             </div>
             <span className="font-semibold text-gray-600">Samo Schedule</span>
           </div>

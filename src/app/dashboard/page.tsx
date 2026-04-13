@@ -22,26 +22,6 @@ function CountdownBadge({ startTime }: { startTime: string }) {
   return <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">อีก {days} วัน</span>
 }
 
-// ── Category chip ──────────────────────────────────────────────────────────────
-const CAT_COLORS: Record<string, string> = {
-  'ทั่วไป':          'bg-gray-100 text-gray-600',
-  'วิชาการ':         'bg-blue-50 text-blue-700',
-  'กีฬา':            'bg-emerald-50 text-emerald-700',
-  'บำเพ็ญประโยชน์':  'bg-green-50 text-green-700',
-  'ศิลปวัฒนธรรม':    'bg-purple-50 text-purple-700',
-  'สัมมนา':          'bg-indigo-50 text-indigo-700',
-  'อื่นๆ':           'bg-pink-50 text-pink-700',
-}
-function CategoryChip({ cat }: { cat?: string }) {
-  const label = cat || 'ทั่วไป'
-  return (
-    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md ${CAT_COLORS[label] || 'bg-gray-100 text-gray-600'}`}>
-      {label}
-    </span>
-  )
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
 export default function DashboardPage() {
   const [user, setUser]         = useState<any>(null)
   const [loading, setLoading]   = useState(true)
@@ -51,8 +31,6 @@ export default function DashboardPage() {
   const [searchQ, setSearchQ]   = useState('')
   const [searchResults, setSearchResults] = useState<any[] | null>(null)
   const [searching, setSearching] = useState(false)
-  const [catFilter, setCatFilter] = useState<string | null>(null)
-  const [allEvents, setAllEvents] = useState<any[]>([])
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
@@ -98,7 +76,6 @@ export default function DashboardPage() {
     })
     setPinned(pinnedData || [])
     setUpcoming(upcomingData || [])
-    setAllEvents(upcomingData || [])
     setLoading(false)
   }, [])
 
@@ -122,11 +99,7 @@ export default function DashboardPage() {
     return () => clearTimeout(timeout)
   }, [searchQ])
 
-  const displayEvents = searchResults !== null ? searchResults
-    : catFilter ? upcoming.filter(e => (e.category || 'ทั่วไป') === catFilter)
-    : upcoming
-
-  const CATEGORIES = ['ทั่วไป', 'วิชาการ', 'กีฬา', 'บำเพ็ญประโยชน์', 'ศิลปวัฒนธรรม', 'สัมมนา', 'อื่นๆ']
+  const displayEvents = searchResults !== null ? searchResults : upcoming
 
   const statCards = [
     { label: 'โครงการทั้งหมด', value: stats.projects, icon: <FolderKanban size={20} />, color: 'text-blue-600 bg-blue-50' },
@@ -135,7 +108,6 @@ export default function DashboardPage() {
     { label: 'ปักหมุดอยู่',     value: stats.pinned,   icon: <Pin size={20} />,  color: 'text-orange-600 bg-orange-50' },
   ]
 
-  // ─────────────────────────────────────────────────────────────────────────
   return (
     <div className="flex min-h-screen bg-gray-50 text-gray-900">
       <Sidebar user={user} activePage="dashboard" onLogout={handleLogout}
@@ -197,7 +169,6 @@ export default function DashboardPage() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
                             <h3 className="font-bold text-sm text-gray-900 truncate">{e.title}</h3>
-                            <CategoryChip cat={e.category} />
                           </div>
                           <p className="text-xs text-gray-400 mt-0.5">
                             {format(parseISO(e.start_time), 'd MMM yyyy', { locale: th })}
@@ -242,22 +213,6 @@ export default function DashboardPage() {
                   )}
                 </div>
 
-                {/* Category filter chips */}
-                {!searchQ && (
-                  <div className="flex gap-2 flex-wrap mb-3">
-                    <button onClick={() => setCatFilter(null)}
-                      className={`text-xs font-bold px-3 py-1 rounded-full border transition ${!catFilter ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'}`}>
-                      ทั้งหมด
-                    </button>
-                    {CATEGORIES.map(c => (
-                      <button key={c} onClick={() => setCatFilter(catFilter === c ? null : c)}
-                        className={`text-xs font-bold px-3 py-1 rounded-full border transition ${catFilter === c ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'}`}>
-                        {c}
-                      </button>
-                    ))}
-                  </div>
-                )}
-
                 {/* Events list */}
                 {displayEvents.length === 0 ? (
                   <div className="text-center py-12 text-gray-400">
@@ -282,7 +237,6 @@ export default function DashboardPage() {
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 flex-wrap mb-0.5">
                                 <h3 className="font-bold text-sm text-gray-900">{e.title}</h3>
-                                <CategoryChip cat={e.category} />
                                 {e.is_pinned && (
                                   <span className="text-[9px] font-bold text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded-md">ปักหมุด</span>
                                 )}

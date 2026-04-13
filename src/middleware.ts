@@ -39,9 +39,9 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
-  // ถ้ามี user แล้ว แต่พยายามเข้าหน้า login หรือหน้าแรก ให้ดีดไป calendar
+  // ถ้ามี user แล้ว แต่พยายามเข้าหน้า login หรือหน้าแรก ให้ดีดไป dashboard
   if (user && (pathname === '/' || pathname.startsWith('/login'))) {
-    return NextResponse.redirect(new URL('/calendar', request.url))
+    return NextResponse.redirect(new URL('/dashboard', request.url))
   }
 
   return response

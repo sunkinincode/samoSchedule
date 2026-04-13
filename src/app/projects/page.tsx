@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import {
-  FolderKanban, User as UserIcon, QrCode,
+  FolderKanban, User as UserIcon,
   ChevronRight, X, Clock, Trash2, Edit,
   CalendarDays, CalendarClock, CalendarRange, CalendarX2,
   ListTodo, CalendarCheck, Users, Building2, BadgeCheck,
@@ -124,17 +124,55 @@ function RoleBadge({ role }: { role: string }) {
 }
 
 // ─── Profile Modal ────────────────────────────────────────────────────────────
-function ProfileModal({ manager, allProjects, allTileEvents, onClose }: {
+function ProfileModal({ manager, onClose }: {
   manager: any
-  allProjects: any[]
-  allTileEvents: Record<string, any[]>
   onClose: () => void
 }) {
-  // Find all projects this manager is involved in
-  const theirProjects = allProjects.filter(p => {
-    const ids = p.manager_id ? p.manager_id.split(',').map((s: string) => s.trim()) : []
-    return ids.includes(manager.student_id)
-  })
+  const [theirProjects, setTheirProjects] = useState<any[]>([])
+  const [theirEvents, setTheirEvents] = useState<Record<string, any[]>>({})
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let isMounted = true
+    async function fetchManagerData() {
+      setLoading(true)
+      const { data: projects } = await supabase
+        .from('projects')
+        .select('*')
+        .ilike('manager_id', `%${manager.student_id}%`)
+        .order('created_at', { ascending: false })
+
+      if (!isMounted) return
+      const fetchedProjects = projects || []
+      setTheirProjects(fetchedProjects)
+
+      if (fetchedProjects.length > 0) {
+        const { data: eventsData } = await supabase
+          .from('events')
+          .select('id, project_id, start_time, end_time, title, event_type')
+          .in('project_id', fetchedProjects.map(p => p.id))
+
+        if (!isMounted) return
+        const map: Record<string, any[]> = {}
+        for (const ev of eventsData || []) {
+          if (!map[ev.project_id]) map[ev.project_id] = []
+          map[ev.project_id].push(ev)
+        }
+        setTheirEvents(map)
+      } else {
+        setTheirEvents({})
+      }
+      setLoading(false)
+    }
+
+    if (manager?.student_id) {
+      fetchManagerData()
+    } else {
+      setLoading(false)
+    }
+
+    return () => { isMounted = false }
+  }, [manager])
 
   return (
     <div
@@ -193,15 +231,19 @@ function ProfileModal({ manager, allProjects, allTileEvents, onClose }: {
         <div className="px-6 pb-6 pt-2 border-t border-gray-100">
           <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-3 flex items-center gap-1.5">
             <FolderKanban size={11} />
-            ดูแลโครงการ ({theirProjects.length})
+            ดูแลโครงการ {loading ? '' : `(${theirProjects.length})`}
           </p>
 
-          {theirProjects.length === 0 ? (
+          {loading ? (
+             <div className="flex justify-center py-6">
+                <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+             </div>
+          ) : theirProjects.length === 0 ? (
             <p className="text-xs text-gray-400 text-center py-4">ไม่มีข้อมูลโครงการ</p>
           ) : (
             <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
               {theirProjects.map(p => {
-                const summary = getProjectDateSummary(allTileEvents[p.id] || [])
+                const summary = getProjectDateSummary(theirEvents[p.id] || [])
                 const isDeeden = p.type === 'ดีเด่น'
                 return (
                   <div key={p.id}
@@ -229,11 +271,9 @@ function ProfileModal({ manager, allProjects, allTileEvents, onClose }: {
 }
 
 // ─── Managers Section (inside project detail panel) ───────────────────────────
-function ManagersSection({ project, allUsers, allProjects, allTileEvents, currentUser }: {
+function ManagersSection({ project, allUsers, currentUser }: {
   project: any
   allUsers: any[]
-  allProjects: any[]
-  allTileEvents: Record<string, any[]>
   currentUser: any
 }) {
   const [selectedManager, setSelectedManager] = useState<any | null>(null)
@@ -257,7 +297,7 @@ function ManagersSection({ project, allUsers, allProjects, allTileEvents, curren
 
   return (
     <>
-      <div className="bg-gray-50 rounded-2xl border border-gray-100 p-4">
+      <div className="bg-gray-50 rounded-2xl border border-gray-100 p-4 w-full">
         {/* Header */}
         <div className="flex items-center justify-between mb-3">
           <p className="text-[10px] font-black uppercase tracking-widest text-gray-500 flex items-center gap-1.5">
@@ -288,7 +328,7 @@ function ManagersSection({ project, allUsers, allProjects, allTileEvents, curren
           </div>
         ) : (
           // ── Grid layout for larger teams ──
-          <div className="grid grid-cols-4 gap-2">
+          <div className="grid grid-cols-4 md:grid-cols-6 gap-2">
             {shown.map((mgr: any) => (
               <ManagerGridCell
                 key={mgr.student_id} manager={mgr}
@@ -303,8 +343,6 @@ function ManagersSection({ project, allUsers, allProjects, allTileEvents, curren
       {selectedManager && (
         <ProfileModal
           manager={selectedManager}
-          allProjects={allProjects}
-          allTileEvents={allTileEvents}
           onClose={() => setSelectedManager(null)}
         />
       )}
@@ -407,7 +445,6 @@ export default function ProjectsPage() {
         .from('events')
         .select('id, project_id, start_time, end_time, title, event_type')
         .in('project_id', projects.map(p => p.id))
-        .order('start_time', { ascending: true })
       const map: Record<string, any[]> = {}
       for (const ev of eventsData || []) {
         if (!map[ev.project_id]) map[ev.project_id] = []
@@ -584,30 +621,13 @@ export default function ProjectsPage() {
               {/* Panel body */}
               <div className="flex-1 overflow-y-auto p-5 md:p-7 space-y-6 bg-white">
 
-                {/* ── 2-col: QR + Managers ─────────────────────────────── */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-                  {/* QR Code */}
-                  <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 text-center">
-                    <p className="text-xs font-bold text-gray-500 mb-3 flex justify-center items-center gap-1">
-                      <QrCode size={13} /> Line กลุ่มโครงการ
-                    </p>
-                    <div className="aspect-square bg-white rounded-xl border-2 border-dashed border-gray-200 flex items-center justify-center overflow-hidden p-2">
-                      {selectedProject.line_qr_url
-                        ? <img src={selectedProject.line_qr_url} alt="QR" className="w-full h-full object-contain" />
-                        : <span className="text-xs text-gray-400">ไม่มี QR Code</span>}
-                    </div>
-                  </div>
-
-                  {/* Managers Section */}
-                  <div className="md:col-span-2">
-                    <ManagersSection
-                      project={selectedProject}
-                      allUsers={allUsers}
-                      allProjects={projects}
-                      allTileEvents={tileEvents}
-                      currentUser={user}
-                    />
-                  </div>
+                {/* ── Managers Section (Full Width) ────────────────────── */}
+                <div className="w-full">
+                  <ManagersSection
+                    project={selectedProject}
+                    allUsers={allUsers}
+                    currentUser={user}
+                  />
                 </div>
 
                 {/* ── Events ───────────────────────────────────────────── */}

@@ -6,7 +6,7 @@ import {
   Calendar as CalendarIcon, Download, MapPin, Clock,
   Plus, X, ChevronLeft, ChevronRight, Edit, Trash2,
   List, Grid3X3, Upload, FileText, AlertCircle, CheckCircle2, ListTodo,
-  Search, Pin, ExternalLink, Tag,
+  Search, Pin, ExternalLink,
 } from 'lucide-react'
 import {
   format, addMonths, subMonths, startOfMonth, endOfMonth,
@@ -42,8 +42,6 @@ function getProjectColor(projectId?: string | null) {
 const TASK_COLOR = { light: '#FFFBEB', text: '#92400E', border: '#F59E0B' }
 
 // ─── CSV parser ───────────────────────────────────────────────────────────────
-// Expected columns: title, start_date, start_time, end_date, end_time, location, description
-// Dates: YYYY-MM-DD, Times: HH:MM (optional)
 function parseCSV(text: string): { rows: any[]; errors: string[] } {
   const lines  = text.trim().split(/\r?\n/)
   if (lines.length < 2) return { rows: [], errors: ['ไฟล์ว่างหรือไม่มีข้อมูล'] }
@@ -60,7 +58,6 @@ function parseCSV(text: string): { rows: any[]; errors: string[] } {
     const line = lines[i].trim()
     if (!line) continue
 
-    // Handle quoted fields with commas
     const vals: string[] = []
     let cur = '', inQ = false
     for (const ch of line) {
@@ -93,16 +90,13 @@ function parseCSV(text: string): { rows: any[]; errors: string[] } {
   return { rows, errors }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-
 export default function CalendarPage() {
   const [events, setEvents]         = useState<any[]>([])
-  const [taskEvents, setTaskEvents] = useState<any[]>([])  // manager's project tasks
+  const [taskEvents, setTaskEvents] = useState<any[]>([])  
   const [loading, setLoading]       = useState(true)
   const [user, setUser]             = useState<any>(null)
   const [myProjectIds, setMyProjectIds] = useState<string[]>([])
 
-  // Add/edit modal
   const [isModalOpen, setIsModalOpen]   = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [editId, setEditId]             = useState<string | null>(null)
@@ -111,7 +105,6 @@ export default function CalendarPage() {
   const [formLoc, setFormLoc]           = useState('')
   const [schedule, setSchedule]         = useState<ScheduleState>(EMPTY_SCHEDULE)
 
-  // CSV modal
   const [isCsvOpen, setIsCsvOpen]       = useState(false)
   const [csvParsed, setCsvParsed]       = useState<any[] | null>(null)
   const [csvErrors, setCsvErrors]       = useState<string[]>([])
@@ -122,11 +115,9 @@ export default function CalendarPage() {
   const [selectedEvent, setSelectedEvent] = useState<any>(null)
   const [currentMonth, setCurrentMonth]   = useState(new Date())
   const [viewMode, setViewMode]           = useState<'month' | 'agenda'>('month')
-  const [showTasks, setShowTasks]         = useState(true)  // toggle task visibility
-  const [showOverflow, setShowOverflow]   = useState(false)  // mobile overflow menu
+  const [showTasks, setShowTasks]         = useState(true)  
+  const [showOverflow, setShowOverflow]   = useState(false)  
   const [searchQ, setSearchQ]             = useState('')
-  const [catFilter, setCatFilter]         = useState<string | null>(null)
-  const [formCategory, setFormCategory]   = useState('ทั่วไป')
   const [formLinks, setFormLinks]         = useState<{ label: string; url: string }[]>([])
   const [formIsPinned, setFormIsPinned]   = useState(false)
 
@@ -134,9 +125,6 @@ export default function CalendarPage() {
   const isPresident = user?.user_metadata?.student_id === '6710210395'
   const canPin = isAdmin || isPresident
 
-  const CATEGORIES = ['ทั่วไป', 'วิชาการ', 'กีฬา', 'บำเพ็ญประโยชน์', 'ศิลปวัฒนธรรม', 'สัมมนา', 'อื่นๆ']
-
-  // ── Fetch ──────────────────────────────────────────────────────────────────
   const loadUser = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return (window.location.href = '/login')
@@ -185,7 +173,7 @@ export default function CalendarPage() {
       await fetchTaskEvents(ids)
       setLoading(false)
     })()
-  }, [])
+  }, [loadUser, fetchEvents, fetchMyProjects, fetchTaskEvents])
 
   const handleUserUpdated = async () => {
     const u = await loadUser()
@@ -197,11 +185,10 @@ export default function CalendarPage() {
     window.location.href = '/'
   }
 
-  // ── Add / Edit modal ───────────────────────────────────────────────────────
   const openAddModal = () => {
     setEditId(null)
     setFormTitle(''); setFormDesc(''); setFormLoc('')
-    setFormCategory('ทั่วไป'); setFormLinks([]); setFormIsPinned(false)
+    setFormLinks([]); setFormIsPinned(false)
     setSchedule(EMPTY_SCHEDULE)
     setIsModalOpen(true)
   }
@@ -211,7 +198,6 @@ export default function CalendarPage() {
     setFormTitle(event.title)
     setFormDesc(event.description || '')
     setFormLoc(event.location || '')
-    setFormCategory(event.category || 'ทั่วไป')
     setFormLinks(event.links || [])
     setFormIsPinned(event.is_pinned || false)
     setSchedule(eventToSchedule(event))
@@ -226,7 +212,6 @@ export default function CalendarPage() {
     try {
       const base = {
         title: formTitle, description: formDesc, location: formLoc,
-        category: formCategory,
         links: formLinks.filter(l => l.url.trim()),
         is_pinned: formIsPinned,
         created_by: user.id,
@@ -256,7 +241,6 @@ export default function CalendarPage() {
     fetchEvents()
   }
 
-  // ── CSV import ─────────────────────────────────────────────────────────────
   const handleCsvFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -292,7 +276,6 @@ export default function CalendarPage() {
     if (csvFileRef.current) csvFileRef.current.value = ''
   }
 
-  // ── Calendar helpers ───────────────────────────────────────────────────────
   const monthStart   = startOfMonth(currentMonth)
   const calendarDays = eachDayOfInterval({
     start: startOfWeek(monthStart),
@@ -303,8 +286,8 @@ export default function CalendarPage() {
     ...events,
     ...(showTasks ? taskEvents.map(e => ({ ...e, _isTask: true })) : []),
   ]
+  
   const allDisplayEvents = allDisplayEventsRaw
-    .filter(e => !catFilter || (e.category || 'ทั่วไป') === catFilter)
     .filter(e => !searchQ || e.title?.toLowerCase().includes(searchQ.toLowerCase()) || e.description?.toLowerCase().includes(searchQ.toLowerCase()))
 
   const getEventsForDay = (day: Date) =>
@@ -326,24 +309,19 @@ export default function CalendarPage() {
       agendaByDate[key].push(event)
     })
 
-  // ─────────────────────────────────────────────────────────────────────────
   return (
     <div className="flex min-h-screen bg-gray-50 text-gray-900">
       <Sidebar user={user} activePage="calendar" onLogout={handleLogout} onUserUpdated={handleUserUpdated} />
       <MobileNav activePage="calendar" user={user} onUserUpdated={handleUserUpdated} />
 
-      {/* Close overflow when clicking outside */}
       {showOverflow && (
         <div className="fixed inset-0 z-40" onClick={() => setShowOverflow(false)} />
       )}
 
       <main className="flex-1 overflow-y-auto w-full relative pb-20 md:pb-0">
 
-        {/* ── Header ──────────────────────────────────────────────────── */}
         <header className="bg-white border-b border-gray-200 sticky top-0 z-20">
           <div className="flex items-center gap-2 px-4 md:px-6 py-3">
-
-            {/* Month navigation — left */}
             <div className="flex items-center gap-0.5">
               <button onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
                 className="p-2 hover:bg-gray-100 rounded-xl transition">
@@ -364,10 +342,8 @@ export default function CalendarPage() {
               </button>
             </div>
 
-            {/* Spacer */}
             <div className="flex-1" />
 
-            {/* ── Mobile: view toggle + overflow ── */}
             <div className="flex md:hidden items-center gap-2">
               <div className="flex items-center bg-gray-100 rounded-xl p-1">
                 <button onClick={() => setViewMode('month')}
@@ -405,9 +381,6 @@ export default function CalendarPage() {
                       className="flex items-center gap-2.5 w-full px-3 py-2.5 rounded-xl hover:bg-gray-50 transition text-sm font-medium text-gray-700">
                       <Download size={15} className="text-gray-400" /> ส่งออก .ics
                     </button>
-                    <div className="px-3 py-2">
-                      <GoogleCalendarButton compact />
-                    </div>
                     {isAdmin && (
                       <>
                         <div className="h-px bg-gray-100 my-1.5" />
@@ -429,7 +402,6 @@ export default function CalendarPage() {
               )}
             </div>
 
-            {/* ── Desktop: full action bar ── */}
             <div className="hidden md:flex items-center gap-2">
               <button onClick={() => setCurrentMonth(new Date())}
                 className="text-xs font-bold text-blue-600 hover:bg-blue-50 px-3 py-1.5 rounded-full border border-blue-200 transition">
@@ -471,26 +443,12 @@ export default function CalendarPage() {
           </div>
         </header>
 
-        {/* ── Body ────────────────────────────────────────────────────── */}
-        {/* ── Search + category filter bar ── */}
-        <div className="bg-white border-b border-gray-100 px-4 md:px-6 py-2.5 flex items-center gap-2 flex-wrap">
-          <div className="relative flex-1 min-w-[160px]">
-            <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+        <div className="bg-white border-b border-gray-100 px-4 md:px-6 py-2.5 flex items-center gap-2">
+          <div className="relative flex-1 w-full max-w-md">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input type="text" placeholder="ค้นหากิจกรรม..."
               value={searchQ} onChange={e => setSearchQ(e.target.value)}
-              className="w-full pl-8 pr-3 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-blue-500" />
-          </div>
-          <div className="flex gap-1.5 flex-wrap">
-            <button onClick={() => setCatFilter(null)}
-              className={`text-[10px] font-bold px-2.5 py-1 rounded-full border transition ${!catFilter ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'}`}>
-              ทั้งหมด
-            </button>
-            {['วิชาการ','กีฬา','บำเพ็ญประโยชน์','ศิลปวัฒนธรรม','สัมมนา'].map(c => (
-              <button key={c} onClick={() => setCatFilter(catFilter === c ? null : c)}
-                className={`text-[10px] font-bold px-2.5 py-1 rounded-full border transition ${catFilter === c ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'}`}>
-                {c}
-              </button>
-            ))}
+              className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500" />
           </div>
         </div>
 
@@ -501,7 +459,6 @@ export default function CalendarPage() {
             </div>
 
           ) : viewMode === 'agenda' ? (
-            /* ══ AGENDA ════════════════════════════════════════════════ */
             <div className="max-w-2xl mx-auto space-y-5">
               {Object.keys(agendaByDate).length === 0 ? (
                 <div className="text-center py-20 text-gray-400">
@@ -568,7 +525,6 @@ export default function CalendarPage() {
             </div>
 
           ) : (
-            /* ══ MONTH VIEW ════════════════════════════════════════════ */
             <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
               <div className="grid grid-cols-7 border-b border-gray-100 bg-gray-50/80">
                 {['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'].map(d => (
@@ -631,7 +587,6 @@ export default function CalendarPage() {
                 })}
               </div>
 
-              {/* Legend */}
               {allDisplayEvents.length > 0 && (
                 <div className="border-t border-gray-100 px-4 py-3 bg-gray-50/50 flex flex-wrap gap-x-4 gap-y-1.5">
                   {Array.from(new Map(
@@ -657,7 +612,6 @@ export default function CalendarPage() {
           )}
         </section>
 
-        {/* ── Event Detail Modal ───────────────────────────────────────── */}
         {selectedEvent && (
           <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
             onClick={() => setSelectedEvent(null)}>
@@ -711,14 +665,6 @@ export default function CalendarPage() {
                     <p className="text-sm font-semibold text-gray-800 self-center">{selectedEvent.location}</p>
                   </div>
                 )}
-                {selectedEvent.category && selectedEvent.category !== 'ทั่วไป' && (
-                  <div className="flex items-center gap-2">
-                    <div className="w-9 h-9 rounded-xl bg-purple-50 flex items-center justify-center shrink-0">
-                      <Tag size={14} className="text-purple-500" />
-                    </div>
-                    <span className="text-sm font-semibold text-gray-700">{selectedEvent.category}</span>
-                  </div>
-                )}
                 {selectedEvent.links && selectedEvent.links.length > 0 && (
                   <div className="flex flex-col gap-2">
                     {selectedEvent.links.map((l: any, i: number) => (
@@ -761,7 +707,6 @@ export default function CalendarPage() {
           </div>
         )}
 
-        {/* ── Add / Edit Modal ─────────────────────────────────────────── */}
         {isModalOpen && (
           <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
             onClick={() => setIsModalOpen(false)}>
@@ -791,20 +736,6 @@ export default function CalendarPage() {
                   <input type="text" className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500"
                     value={formLoc} onChange={e => setFormLoc(e.target.value)} placeholder="สถานที่" />
 
-                  {/* Category */}
-                  <div>
-                    <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">ประเภทกิจกรรม</p>
-                    <div className="flex flex-wrap gap-2">
-                      {['ทั่วไป', 'วิชาการ', 'กีฬา', 'บำเพ็ญประโยชน์', 'ศิลปวัฒนธรรม', 'สัมมนา', 'อื่นๆ'].map(c => (
-                        <button key={c} type="button" onClick={() => setFormCategory(c)}
-                          className={`text-xs font-bold px-3 py-1.5 rounded-full border transition ${formCategory === c ? 'bg-blue-600 text-white border-blue-600' : 'bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100'}`}>
-                          {c}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Links */}
                   <div>
                     <div className="flex items-center justify-between mb-2">
                       <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">ลิงก์แนบ</p>
@@ -828,7 +759,6 @@ export default function CalendarPage() {
                     ))}
                   </div>
 
-                  {/* Pin toggle — admin/president only */}
                   {canPin && (
                     <button type="button" onClick={() => setFormIsPinned(!formIsPinned)}
                       className={`flex items-center gap-2 w-full px-4 py-3 rounded-xl border transition text-sm font-bold ${formIsPinned ? 'bg-orange-50 border-orange-300 text-orange-700' : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100'}`}>
@@ -851,7 +781,6 @@ export default function CalendarPage() {
           </div>
         )}
 
-        {/* ── CSV Import Modal ─────────────────────────────────────────── */}
         {isCsvOpen && (
           <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
             onClick={closeCsvModal}>
@@ -870,7 +799,6 @@ export default function CalendarPage() {
               </div>
 
               <div className="p-6 space-y-4">
-                {/* Format guide */}
                 <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
                   <p className="text-xs font-bold text-blue-700 mb-2 flex items-center gap-1.5">
                     <FileText size={13} /> รูปแบบ CSV ที่รองรับ
@@ -885,7 +813,6 @@ export default function CalendarPage() {
                   </div>
                 </div>
 
-                {/* File picker */}
                 <div>
                   <input ref={csvFileRef} type="file" accept=".csv,text/csv" className="hidden" onChange={handleCsvFile} />
                   <button type="button" onClick={() => csvFileRef.current?.click()}
@@ -895,7 +822,6 @@ export default function CalendarPage() {
                   </button>
                 </div>
 
-                {/* Errors */}
                 {csvErrors.length > 0 && (
                   <div className="bg-red-50 border border-red-100 rounded-xl p-3 space-y-1">
                     {csvErrors.map((e, i) => (
@@ -906,7 +832,6 @@ export default function CalendarPage() {
                   </div>
                 )}
 
-                {/* Preview */}
                 {csvParsed && csvParsed.length > 0 && (
                   <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3">
                     <p className="text-[11px] text-emerald-700 font-bold flex items-center gap-1.5 mb-2">
