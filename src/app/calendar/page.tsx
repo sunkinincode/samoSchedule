@@ -6,15 +6,15 @@ import {
   Calendar as CalendarIcon, Download, MapPin, Clock,
   Plus, X, ChevronLeft, ChevronRight, Edit, Trash2,
   List, Grid3X3, Upload, FileText, AlertCircle, CheckCircle2, ListTodo,
+  Search, Pin, ExternalLink, Tag,
 } from 'lucide-react'
 import {
   format, addMonths, subMonths, startOfMonth, endOfMonth,
   startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, isSameDay,
-  parseISO, startOfDay, endOfDay,
+  parseISO, startOfDay, endOfDay, differenceInDays,
 } from 'date-fns'
 import { th } from 'date-fns/locale'
 import Sidebar from '@/components/Sidebar'
-import GoogleCalendarButton from '@/components/GoogleCalendarButton'
 import MobileNav from '@/components/MobileNav'
 import SchedulePicker, {
   ScheduleState, EMPTY_SCHEDULE, buildEventRows, eventToSchedule,
@@ -124,8 +124,17 @@ export default function CalendarPage() {
   const [viewMode, setViewMode]           = useState<'month' | 'agenda'>('month')
   const [showTasks, setShowTasks]         = useState(true)  // toggle task visibility
   const [showOverflow, setShowOverflow]   = useState(false)  // mobile overflow menu
+  const [searchQ, setSearchQ]             = useState('')
+  const [catFilter, setCatFilter]         = useState<string | null>(null)
+  const [formCategory, setFormCategory]   = useState('ทั่วไป')
+  const [formLinks, setFormLinks]         = useState<{ label: string; url: string }[]>([])
+  const [formIsPinned, setFormIsPinned]   = useState(false)
 
   const isAdmin = user?.user_metadata?.role === 'admin'
+  const isPresident = user?.user_metadata?.student_id === '6710210395'
+  const canPin = isAdmin || isPresident
+
+  const CATEGORIES = ['ทั่วไป', 'วิชาการ', 'กีฬา', 'บำเพ็ญประโยชน์', 'ศิลปวัฒนธรรม', 'สัมมนา', 'อื่นๆ']
 
   // ── Fetch ──────────────────────────────────────────────────────────────────
   const loadUser = useCallback(async () => {
@@ -192,6 +201,7 @@ export default function CalendarPage() {
   const openAddModal = () => {
     setEditId(null)
     setFormTitle(''); setFormDesc(''); setFormLoc('')
+    setFormCategory('ทั่วไป'); setFormLinks([]); setFormIsPinned(false)
     setSchedule(EMPTY_SCHEDULE)
     setIsModalOpen(true)
   }
@@ -201,6 +211,9 @@ export default function CalendarPage() {
     setFormTitle(event.title)
     setFormDesc(event.description || '')
     setFormLoc(event.location || '')
+    setFormCategory(event.category || 'ทั่วไป')
+    setFormLinks(event.links || [])
+    setFormIsPinned(event.is_pinned || false)
     setSchedule(eventToSchedule(event))
     setSelectedEvent(null)
     setIsModalOpen(true)
@@ -213,6 +226,9 @@ export default function CalendarPage() {
     try {
       const base = {
         title: formTitle, description: formDesc, location: formLoc,
+        category: formCategory,
+        links: formLinks.filter(l => l.url.trim()),
+        is_pinned: formIsPinned,
         created_by: user.id,
       }
       if (editId) {
@@ -283,10 +299,13 @@ export default function CalendarPage() {
     end:   endOfWeek(endOfMonth(monthStart)),
   })
 
-  const allDisplayEvents = [
+  const allDisplayEventsRaw = [
     ...events,
     ...(showTasks ? taskEvents.map(e => ({ ...e, _isTask: true })) : []),
   ]
+  const allDisplayEvents = allDisplayEventsRaw
+    .filter(e => !catFilter || (e.category || 'ทั่วไป') === catFilter)
+    .filter(e => !searchQ || e.title?.toLowerCase().includes(searchQ.toLowerCase()) || e.description?.toLowerCase().includes(searchQ.toLowerCase()))
 
   const getEventsForDay = (day: Date) =>
     allDisplayEvents.filter(event => {
@@ -436,7 +455,6 @@ export default function CalendarPage() {
                 className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-gray-600 hover:bg-gray-100 rounded-xl transition border border-gray-200">
                 <Download size={14} /> ส่งออก
               </button>
-              <GoogleCalendarButton />
               {isAdmin && (
                 <>
                   <button onClick={() => setIsCsvOpen(true)}
@@ -454,6 +472,28 @@ export default function CalendarPage() {
         </header>
 
         {/* ── Body ────────────────────────────────────────────────────── */}
+        {/* ── Search + category filter bar ── */}
+        <div className="bg-white border-b border-gray-100 px-4 md:px-6 py-2.5 flex items-center gap-2 flex-wrap">
+          <div className="relative flex-1 min-w-[160px]">
+            <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input type="text" placeholder="ค้นหากิจกรรม..."
+              value={searchQ} onChange={e => setSearchQ(e.target.value)}
+              className="w-full pl-8 pr-3 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-blue-500" />
+          </div>
+          <div className="flex gap-1.5 flex-wrap">
+            <button onClick={() => setCatFilter(null)}
+              className={`text-[10px] font-bold px-2.5 py-1 rounded-full border transition ${!catFilter ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'}`}>
+              ทั้งหมด
+            </button>
+            {['วิชาการ','กีฬา','บำเพ็ญประโยชน์','ศิลปวัฒนธรรม','สัมมนา'].map(c => (
+              <button key={c} onClick={() => setCatFilter(catFilter === c ? null : c)}
+                className={`text-[10px] font-bold px-2.5 py-1 rounded-full border transition ${catFilter === c ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'}`}>
+                {c}
+              </button>
+            ))}
+          </div>
+        </div>
+
         <section className="p-3 md:p-6">
           {loading ? (
             <div className="flex items-center justify-center h-64">
@@ -499,9 +539,18 @@ export default function CalendarPage() {
                                     <span style={{ color: color.text }} className="text-[10px] font-semibold opacity-60 block">{event.projects.name_th}</span>
                                   )}
                                 </div>
-                                <span className="text-xs text-gray-500 font-medium shrink-0 mt-0.5">
-                                  {format(parseISO(event.start_time), 'HH:mm')}
-                                </span>
+                                <div className="flex flex-col items-end gap-1 shrink-0">
+                                  <span className="text-xs text-gray-500 font-medium">
+                                    {format(parseISO(event.start_time), 'HH:mm')}
+                                  </span>
+                                  {(() => {
+                                    const days = differenceInDays(startOfDay(parseISO(event.start_time)), startOfDay(new Date()))
+                                    if (days === 0) return <span className="text-[9px] font-bold text-red-600 bg-red-50 px-1.5 py-0.5 rounded-full">วันนี้</span>
+                                    if (days === 1) return <span className="text-[9px] font-bold text-orange-500 bg-orange-50 px-1.5 py-0.5 rounded-full">พรุ่งนี้</span>
+                                    if (days > 0 && days <= 7) return <span className="text-[9px] font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded-full">อีก {days} วัน</span>
+                                    return null
+                                  })()}
+                                </div>
                               </div>
                               {event.location && (
                                 <p className="text-[10px] text-gray-500 mt-1 flex items-center gap-1">
@@ -662,20 +711,49 @@ export default function CalendarPage() {
                     <p className="text-sm font-semibold text-gray-800 self-center">{selectedEvent.location}</p>
                   </div>
                 )}
+                {selectedEvent.category && selectedEvent.category !== 'ทั่วไป' && (
+                  <div className="flex items-center gap-2">
+                    <div className="w-9 h-9 rounded-xl bg-purple-50 flex items-center justify-center shrink-0">
+                      <Tag size={14} className="text-purple-500" />
+                    </div>
+                    <span className="text-sm font-semibold text-gray-700">{selectedEvent.category}</span>
+                  </div>
+                )}
+                {selectedEvent.links && selectedEvent.links.length > 0 && (
+                  <div className="flex flex-col gap-2">
+                    {selectedEvent.links.map((l: any, i: number) => (
+                      <a key={i} href={l.url} target="_blank" rel="noopener noreferrer"
+                        className="flex items-center gap-2 px-3 py-2.5 bg-blue-50 border border-blue-200 rounded-xl hover:bg-blue-100 transition text-sm font-semibold text-blue-700">
+                        <ExternalLink size={14} /> {l.label || l.url}
+                      </a>
+                    ))}
+                  </div>
+                )}
                 {selectedEvent.description && (
                   <div className="bg-gray-50 p-4 rounded-xl text-sm text-gray-600 whitespace-pre-wrap">{selectedEvent.description}</div>
                 )}
               </div>
 
-              {isAdmin && !selectedEvent._isTask && (
+              {(isAdmin || isPresident) && !selectedEvent._isTask && (
                 <div className="flex gap-2 border-t border-gray-100 pt-4">
+                  {canPin && (
+                    <button onClick={async () => {
+                      const newVal = !selectedEvent.is_pinned
+                      await supabase.from('events').update({ is_pinned: newVal }).eq('id', selectedEvent.id)
+                      setSelectedEvent({ ...selectedEvent, is_pinned: newVal })
+                      fetchEvents()
+                    }}
+                      className={`flex items-center justify-center gap-1.5 px-3 py-3 rounded-xl font-bold transition text-sm shrink-0 ${selectedEvent.is_pinned ? 'bg-orange-100 text-orange-600 hover:bg-orange-200' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>
+                      <Pin size={14} /> {selectedEvent.is_pinned ? 'ถอนหมุด' : 'ปักหมุด'}
+                    </button>
+                  )}
                   <button onClick={() => openEditModal(selectedEvent)}
                     className="flex-1 flex items-center justify-center gap-2 bg-gray-100 hover:bg-blue-50 hover:text-blue-600 text-gray-700 py-3 rounded-xl font-bold transition text-sm">
                     <Edit size={15} /> แก้ไข
                   </button>
                   <button onClick={() => handleDeleteEvent(selectedEvent.id)}
                     className="flex-1 flex items-center justify-center gap-2 bg-red-50 hover:bg-red-500 hover:text-white text-red-500 py-3 rounded-xl font-bold transition text-sm">
-                    <Trash2 size={15} /> ลบกิจกรรม
+                    <Trash2 size={15} /> ลบ
                   </button>
                 </div>
               )}
@@ -712,6 +790,52 @@ export default function CalendarPage() {
 
                   <input type="text" className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500"
                     value={formLoc} onChange={e => setFormLoc(e.target.value)} placeholder="สถานที่" />
+
+                  {/* Category */}
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">ประเภทกิจกรรม</p>
+                    <div className="flex flex-wrap gap-2">
+                      {['ทั่วไป', 'วิชาการ', 'กีฬา', 'บำเพ็ญประโยชน์', 'ศิลปวัฒนธรรม', 'สัมมนา', 'อื่นๆ'].map(c => (
+                        <button key={c} type="button" onClick={() => setFormCategory(c)}
+                          className={`text-xs font-bold px-3 py-1.5 rounded-full border transition ${formCategory === c ? 'bg-blue-600 text-white border-blue-600' : 'bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100'}`}>
+                          {c}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Links */}
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">ลิงก์แนบ</p>
+                      <button type="button"
+                        onClick={() => setFormLinks(prev => [...prev, { label: '', url: '' }])}
+                        className="text-[10px] font-bold text-blue-600 hover:underline">+ เพิ่มลิงก์</button>
+                    </div>
+                    {formLinks.map((l, i) => (
+                      <div key={i} className="flex gap-2 mb-2">
+                        <input type="text" placeholder="ชื่อลิงก์ เช่น Google Form"
+                          value={l.label}
+                          onChange={e => setFormLinks(prev => prev.map((x, j) => j === i ? { ...x, label: e.target.value } : x))}
+                          className="w-32 p-2 bg-gray-50 border border-gray-200 rounded-lg text-xs outline-none focus:ring-2 focus:ring-blue-500" />
+                        <input type="url" placeholder="https://..."
+                          value={l.url}
+                          onChange={e => setFormLinks(prev => prev.map((x, j) => j === i ? { ...x, url: e.target.value } : x))}
+                          className="flex-1 p-2 bg-gray-50 border border-gray-200 rounded-lg text-xs outline-none focus:ring-2 focus:ring-blue-500" />
+                        <button type="button" onClick={() => setFormLinks(prev => prev.filter((_, j) => j !== i))}
+                          className="p-2 text-gray-400 hover:text-red-500 transition"><X size={14} /></button>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Pin toggle — admin/president only */}
+                  {canPin && (
+                    <button type="button" onClick={() => setFormIsPinned(!formIsPinned)}
+                      className={`flex items-center gap-2 w-full px-4 py-3 rounded-xl border transition text-sm font-bold ${formIsPinned ? 'bg-orange-50 border-orange-300 text-orange-700' : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100'}`}>
+                      <Pin size={15} /> {formIsPinned ? 'ปักหมุดอยู่ (กดเพื่อถอน)' : 'ปักหมุดกิจกรรมนี้'}
+                    </button>
+                  )}
+
                   <textarea rows={2} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500 resize-none"
                     value={formDesc} onChange={e => setFormDesc(e.target.value)} placeholder="รายละเอียด" />
                 </form>

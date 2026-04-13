@@ -1,11 +1,11 @@
 'use client'
 import { useState } from 'react'
-import { Calendar as CalendarIcon, FolderKanban, User as UserIcon, LogOut, Pencil, X, Camera, Loader2 } from 'lucide-react'
+import { Calendar as CalendarIcon, FolderKanban, TrendingUp, User as UserIcon, LogOut, Pencil, X, Camera, Loader2 } from 'lucide-react'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 
 interface MobileNavProps {
-  activePage: 'calendar' | 'projects'
+  activePage: 'calendar' | 'projects' | 'dashboard'
   user?: any
   onUserUpdated?: () => void
 }
@@ -66,6 +66,15 @@ export default function MobileNav({ activePage, user, onUserUpdated }: MobileNav
       {/* ── Bottom Tab Bar ──────────────────────────────────────────────── */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-gray-200 z-30">
         <div className="flex items-stretch">
+
+          {/* Dashboard tab */}
+          <Link href="/dashboard"
+            className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5 transition-colors ${
+              activePage === 'dashboard' ? 'text-blue-600' : 'text-gray-400'
+            }`}>
+            <TrendingUp size={22} strokeWidth={activePage === 'dashboard' ? 2.5 : 1.8} />
+            <span className="text-[10px] font-semibold">หน้าหลัก</span>
+          </Link>
 
           {/* Calendar tab */}
           <Link href="/calendar"

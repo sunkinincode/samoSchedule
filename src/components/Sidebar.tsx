@@ -1,13 +1,13 @@
 'use client'
 import { useState, useRef } from 'react'
-import { Calendar as CalendarIcon, FolderKanban, LayoutDashboard, LogOut, User as UserIcon, Pencil, X, Camera, Loader2 } from 'lucide-react'
+import { Calendar as CalendarIcon, FolderKanban, LogOut, User as UserIcon, Pencil, X, Camera, Loader2 } from 'lucide-react'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import GoogleCalendarButton from '@/components/GoogleCalendarButton'
 
 interface SidebarProps {
   user: any
-  activePage: 'calendar' | 'projects'
+  activePage: 'calendar' | 'projects' | 'dashboard'
   onLogout: () => void
   onUserUpdated?: () => void   // callback to refresh user state in parent
 }
@@ -83,8 +83,8 @@ export default function Sidebar({ user, activePage, onLogout, onUserUpdated }: S
       <aside className="w-64 bg-white border-r border-gray-200 flex-col sticky top-0 h-screen hidden md:flex shrink-0">
         {/* Logo */}
         <div className="p-6 border-b border-gray-100 flex items-center gap-2">
-          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-            <LayoutDashboard className="text-white" size={18} />
+          <div className="w-9 h-9 rounded-xl overflow-hidden shadow-sm">
+            <img src="/icon.svg" alt="Samo Schedule" className="w-full h-full" />
           </div>
           <span className="font-bold text-lg text-blue-800">Samo Schedule</span>
         </div>
