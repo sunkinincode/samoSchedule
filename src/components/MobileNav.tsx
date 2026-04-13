@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 
 interface MobileNavProps {
-  activePage: 'calendar' | 'projects' | 'dashboard'
+  activePage: 'calendar' | 'projects' | 'dashboard' | 'proposal'
   user?: any
   onUserUpdated?: () => void
 }

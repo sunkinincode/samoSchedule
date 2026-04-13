@@ -28,10 +28,9 @@ const SDGS = [
   { id: 17, name: 'Partnerships for the Goals' },
 ]
 
-// 🚀 ดึงรูปจากโฟลเดอร์ public/sdgs ในโปรเจกต์
+// ดึงรูปภาพจากเครื่อง
 const getSdgImageUrl = (id: number) => {
   const paddedId = String(id).padStart(2, '0');
-  // หากไฟล์ในเครื่องเป็น .jpg ให้เปลี่ยนจาก .png เป็น .jpg
   return `/sdgs/E_WEB_${paddedId}.png`; 
 }
 
@@ -92,7 +91,7 @@ export default function ProposalClient() {
     init()
   }, [])
 
-  // Auto-save ร่างโครงการทุกครั้งที่มีการพิมพ์
+  // Auto-save
   useEffect(() => {
     if (!loading) {
       const draft = {
@@ -123,15 +122,23 @@ export default function ProposalClient() {
 
   const selectedProject = projects.find(p => p.id === selectedProjectId)
 
-  // 🚀 ฟังก์ชันดาวน์โหลด PDF แบบใหม่ (ใช้ html-to-image)
+  // 🚀 ฟังก์ชันดาวน์โหลด PDF
   const handleDownloadPDF = async () => {
     if (!selectedProjectId) return alert('กรุณาเลือกโครงการที่ต้องการเขียน Proposal')
     if (!pdfRef.current) return
 
     setIsGenerating(true)
+    let prevStyle:
+      | {
+          display: string
+          position: string
+          top: string
+          left: string
+          zIndex: string
+        }
+      | null = null
     
     try {
-      // โหลดไลบรารีแบบ Dynamic เพื่อป้องกัน SSR Error
       let htmlToImage: any;
       let jsPDF: any;
       try {
@@ -145,38 +152,47 @@ export default function ProposalClient() {
       }
 
       const element = pdfRef.current;
+      prevStyle = {
+        display: element.style.display,
+        position: element.style.position,
+        top: element.style.top,
+        left: element.style.left,
+        zIndex: element.style.zIndex,
+      };
       
-      // ดึงกระดาษออกมาวางนอกจอเพื่อให้เอนจินวาดภาพได้ (ซ่อนไว้ที่ z-index: -9999)
+      // ดึงกระดาษออกมาวางนอกจอเพื่อให้เอนจินวาดภาพ
       element.style.display = 'block';
       element.style.position = 'absolute';
       element.style.top = '0';
       element.style.left = '0';
       element.style.zIndex = '-9999';
       
-      // หน่วงเวลาให้เบราว์เซอร์เตรียมภาพ SDGs ให้เสร็จสมบูรณ์
+      // รอให้ฟอนต์โหลดครบก่อนแคปเจอร์ (กันข้อความซ้อน/metrics เพี้ยน)
+      await (document as any).fonts?.ready;
       await new Promise(resolve => setTimeout(resolve, 800));
       
-      // 🚀 ถ่ายภาพด้วย html-to-image
+      // 🚀 ถ่ายภาพด้วย html-to-image พร้อมเกราะป้องกัน CORS
       const dataUrl = await htmlToImage.toPng(element, {
         quality: 0.98,
         backgroundColor: '#ffffff',
-        pixelRatio: 2, // คมชัดแบบ Retina
-        fontEmbedCSS: '', // 👈 สำคัญมาก! ป้องกัน Error CORS จากการดึงฟอนต์ภายนอก
+        pixelRatio: 2, 
+        cacheBust: true,
       });
 
-      // ซ่อนกระดาษกลับหลังถ่ายภาพเสร็จ
-      element.style.display = 'none';
-
-      // สร้าง PDF
       const pdf = new jsPDF({
         orientation: 'portrait',
         unit: 'mm',
         format: 'a4'
       });
 
-      // คำนวณอัตราส่วนภาพให้พอดีกับกระดาษ A4
       const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (element.offsetHeight * pdfWidth) / element.offsetWidth;
+      const rect = element.getBoundingClientRect();
+      const sourceWidth = rect.width || element.offsetWidth;
+      const sourceHeight = rect.height || element.offsetHeight;
+      if (!sourceWidth || !sourceHeight) {
+        throw new Error('ไม่สามารถคำนวณขนาดหน้าเอกสารได้ (element มีขนาดเป็น 0)');
+      }
+      const pdfHeight = (sourceHeight * pdfWidth) / sourceWidth;
 
       pdf.addImage(dataUrl, 'PNG', 0, 0, pdfWidth, pdfHeight);
       pdf.save(`Proposal_${selectedProject?.name_th || 'Document'}.pdf`);
@@ -185,6 +201,14 @@ export default function ProposalClient() {
       console.error('Error generating PDF:', error);
       alert(`เกิดข้อผิดพลาดในการสร้างไฟล์ PDF: ${error.message || error}`);
     } finally {
+      const element = pdfRef.current;
+      if (element && prevStyle) {
+        element.style.display = prevStyle.display;
+        element.style.position = prevStyle.position;
+        element.style.top = prevStyle.top;
+        element.style.left = prevStyle.left;
+        element.style.zIndex = prevStyle.zIndex;
+      }
       setIsGenerating(false);
     }
   }
@@ -198,7 +222,7 @@ export default function ProposalClient() {
   return (
     <div className="flex min-h-screen bg-gray-50 text-gray-900">
       <Sidebar user={user} activePage="proposal" onLogout={() => supabase.auth.signOut()} />
-      <MobileNav activePage="proposal" user={user} />
+      <MobileNav activePage={'proposal' as any} user={user} />
 
       <main className="flex-1 overflow-y-auto w-full pb-20 md:pb-0 relative">
         <header className="bg-white border-b border-gray-200 px-4 md:px-8 py-4 sticky top-0 z-10">
@@ -357,13 +381,15 @@ export default function ProposalClient() {
 // ─── Sub-Component: The A4 Project Sheet ──────────────────────────────────────
 function ProjectSheet({ project, allUsers, sdgs, background, summary }: any) {
   
-  // ดึงข้อมูลผู้รับผิดชอบโครงการ และนายกสโมสร
   const managerIds = project?.manager_id ? project.manager_id.split(',').map((id:string) => id.trim()) : [];
-  const projectManagers = managerIds.map((id:string) => allUsers.find((u:any) => u.student_id === id)).filter(Boolean);
   const president = allUsers.find((u:any) => u.department === 'นายกสโมสร');
+  const presidentStudentId = president?.student_id;
+  const isPresidentAlsoManager = !!(presidentStudentId && managerIds.includes(presidentStudentId));
+  const projectManagers = managerIds
+    .filter((id: string) => id && id !== presidentStudentId)
+    .map((id: string) => allUsers.find((u: any) => u.student_id === id))
+    .filter(Boolean);
 
-  // สไตล์สำหรับป้องกันปัญหา Tailwind oklab() ตอนพิมพ์ PDF 
-  // (ถ้าใช้ html-to-image อาจไม่จำเป็น แต่ใส่กันเหนียวไว้ให้สีดำสนิทและโครงสร้างไม่เพี้ยนครับ)
   const safeStyles = {
     textColor: { color: '#111827' },
     textMuted: { color: '#6B7280' },
@@ -446,13 +472,13 @@ function ProjectSheet({ project, allUsers, sdgs, background, summary }: any) {
                  <p className="font-bold text-xs">({mgr.full_name || mgr.student_id})</p>
                  <p className="text-[9px] mt-1 uppercase tracking-widest font-bold" style={safeStyles.textMuted}>ผู้รับผิดชอบโครงการ</p>
                </div>
-            )) : (
+            )) : !isPresidentAlsoManager ? (
                <div className="text-center w-40">
                  <div className="w-full border-b mb-2" style={safeStyles.borderLight} />
                  <p className="font-bold text-xs">(...........................................)</p>
                  <p className="text-[9px] mt-1 uppercase tracking-widest font-bold" style={safeStyles.textMuted}>ผู้รับผิดชอบโครงการ</p>
                </div>
-            )}
+            ) : null}
          </div>
 
          {president && (
