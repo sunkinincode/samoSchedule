@@ -82,6 +82,13 @@ export default function ProposalClient() {
   
   const pdfRef = useRef<HTMLDivElement>(null)
 
+  const upsertAtIndex = (arr: string[], idx: number, value: string) => {
+    const next = arr.slice()
+    while (next.length <= idx) next.push('')
+    next[idx] = value
+    return next
+  }
+
   useEffect(() => {
     async function init() {
       try {
@@ -617,7 +624,7 @@ export default function ProposalClient() {
                   <input
                     key={idx}
                     value={objectives[idx] ?? ''}
-                    onChange={(e) => setObjectives(prev => prev.map((x, i) => i === idx ? e.target.value : x))}
+                    onChange={(e) => setObjectives(prev => upsertAtIndex(prev, idx, e.target.value))}
                     placeholder={`ข้อที่ ${idx + 1} เช่น เพื่อ...`}
                     className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                   />
@@ -639,7 +646,7 @@ export default function ProposalClient() {
                   <input
                     key={idx}
                     value={kpis[idx] ?? ''}
-                    onChange={(e) => setKpis(prev => prev.map((x, i) => i === idx ? e.target.value : x))}
+                    onChange={(e) => setKpis(prev => upsertAtIndex(prev, idx, e.target.value))}
                     placeholder={`ข้อที่ ${idx + 1} เช่น นักศึกษาเข้าร่วมอย่างน้อย ... คน`}
                     className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                   />
@@ -661,7 +668,7 @@ export default function ProposalClient() {
                   <input
                     key={idx}
                     value={evaluationMethods[idx] ?? ''}
-                    onChange={(e) => setEvaluationMethods(prev => prev.map((x, i) => i === idx ? e.target.value : x))}
+                    onChange={(e) => setEvaluationMethods(prev => upsertAtIndex(prev, idx, e.target.value))}
                     placeholder={`ข้อที่ ${idx + 1} เช่น แบบประเมินความพึงพอใจ`}
                     className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                   />
@@ -683,7 +690,7 @@ export default function ProposalClient() {
                   <input
                     key={idx}
                     value={expectedResults[idx] ?? ''}
-                    onChange={(e) => setExpectedResults(prev => prev.map((x, i) => i === idx ? e.target.value : x))}
+                    onChange={(e) => setExpectedResults(prev => upsertAtIndex(prev, idx, e.target.value))}
                     placeholder={`ข้อที่ ${idx + 1} เช่น ผู้เข้าร่วมได้รับความรู้/ทักษะ...`}
                     className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                   />
