@@ -429,13 +429,28 @@ export default function ProjectsPage() {
     if (error || !user) return (window.location.href = '/login')
     setUser(user)
 
-    const [{ data: usersData }, { data: projectData }] = await Promise.all([
-      supabase.from('users').select('*'),
-      supabase.from('projects')
-        .select('*')
-        .ilike('manager_id', `%${user.user_metadata?.student_id}%`)
-        .order('created_at', { ascending: false }),
+    const sid = user.user_metadata?.student_id
+    const [{ data: usersData }, pmRes] = await Promise.all([
+      // ลด payload: ใช้เฉพาะที่หน้า projects ใช้จริง
+      supabase.from('users').select('id, full_name, student_id, department, role, avatar_url'),
+      supabase.from('project_managers').select('project_id').eq('student_id', sid),
     ])
+    let ids = ((pmRes as any).data || []).map((r: any) => r.project_id)
+    if ((pmRes as any).error) {
+      console.warn('project_managers unavailable, fallback to projects.manager_id', (pmRes as any).error)
+      const { data: legacy } = await supabase
+        .from('projects')
+        .select('id')
+        .ilike('manager_id', `%${sid}%`)
+      ids = (legacy || []).map((p: any) => p.id)
+    }
+    const { data: projectData } = ids.length
+      ? await supabase
+          .from('projects')
+          .select('id, name_th, name_en, type, manager_id, created_at')
+          .in('id', ids)
+          .order('created_at', { ascending: false })
+      : { data: [] as any[] }
     setAllUsers(usersData || [])
     const projects = projectData || []
     setProjects(projects)

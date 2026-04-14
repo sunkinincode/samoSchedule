@@ -46,22 +46,22 @@ export default function DashboardPage() {
     const now = new Date().toISOString()
 
     const [
-      { data: projects },
-      { data: events },
-      { data: members },
+      { count: projectsCount },
+      { count: eventsCount },
+      { count: membersCount },
       { data: pinnedData },
       { data: upcomingData },
     ] = await Promise.all([
-      supabase.from('projects').select('id', { count: 'exact' }),
-      supabase.from('events').select('id', { count: 'exact' }).or('project_id.is.null,event_type.eq.main'),
-      supabase.from('users').select('id', { count: 'exact' }),
+      supabase.from('projects').select('id', { count: 'exact', head: true }),
+      supabase.from('events').select('id', { count: 'exact', head: true }).or('project_id.is.null,event_type.eq.main'),
+      supabase.from('users').select('id', { count: 'exact', head: true }),
       supabase.from('events')
-        .select('*, projects(name_th)')
+        .select('id, title, start_time, end_time, location, is_pinned, event_type, project_id, projects(name_th)')
         .eq('is_pinned', true)
         .eq('event_type', 'main')
         .order('start_time', { ascending: true }),
       supabase.from('events')
-        .select('*, projects(name_th)')
+        .select('id, title, start_time, end_time, location, event_type, project_id, projects(name_th)')
         .or('project_id.is.null,event_type.eq.main')
         .gte('end_time', now)
         .order('start_time', { ascending: true })
@@ -69,9 +69,9 @@ export default function DashboardPage() {
     ])
 
     setStats({
-      projects: projects?.length || 0,
-      events:   events?.length   || 0,
-      members:  members?.length  || 0,
+      projects: projectsCount || 0,
+      events:   eventsCount   || 0,
+      members:  membersCount  || 0,
       pinned:   pinnedData?.length || 0,
     })
     setPinned(pinnedData || [])

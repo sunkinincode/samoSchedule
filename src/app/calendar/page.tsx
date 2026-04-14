@@ -132,22 +132,27 @@ export default function CalendarPage() {
     return user
   }, [])
 
-  const fetchEvents = useCallback(async () => {
+  const fetchEvents = useCallback(async (rangeStartISO: string, rangeEndISO: string) => {
     const { data, error } = await supabase
       .from('events')
-      .select('*, projects(id, name_th), users(department, role)')
+      .select('id, title, start_time, end_time, location, description, links, is_pinned, event_type, project_id, projects(id, name_th), users(department, role)')
       .or('project_id.is.null,event_type.eq.main')
+      // จำกัดช่วงเวลา: ดึงเฉพาะ event ที่ "ทับ" ช่วงเดือนที่เปิดดู (รวม multi-day)
+      .lte('start_time', rangeEndISO)
+      .gte('end_time', rangeStartISO)
       .order('start_time', { ascending: true })
     if (!error) setEvents(data || [])
   }, [])
 
-  const fetchTaskEvents = useCallback(async (projectIds: string[]) => {
+  const fetchTaskEvents = useCallback(async (projectIds: string[], rangeStartISO: string, rangeEndISO: string) => {
     if (projectIds.length === 0) { setTaskEvents([]); return }
     const { data } = await supabase
       .from('events')
-      .select('*, projects(id, name_th)')
+      .select('id, title, start_time, end_time, event_type, project_id, projects(id, name_th)')
       .in('project_id', projectIds)
       .eq('event_type', 'task')
+      .lte('start_time', rangeEndISO)
+      .gte('end_time', rangeStartISO)
       .order('start_time', { ascending: true })
     setTaskEvents(data || [])
   }, [])
@@ -155,11 +160,21 @@ export default function CalendarPage() {
   const fetchMyProjects = useCallback(async (u: any) => {
     const sid = u.user_metadata?.student_id
     if (!sid) return []
-    const { data } = await supabase
-      .from('projects')
-      .select('id')
-      .ilike('manager_id', `%${sid}%`)
-    const ids = (data || []).map((p: any) => p.id)
+    // Prefer relational table; fallback to legacy CSV search if table/policy not ready.
+    const { data: pm, error: pmErr } = await supabase
+      .from('project_managers')
+      .select('project_id')
+      .eq('student_id', sid)
+
+    let ids = (pm || []).map((r: any) => r.project_id)
+    if (pmErr) {
+      console.warn('project_managers unavailable, fallback to projects.manager_id', pmErr)
+      const { data: legacy } = await supabase
+        .from('projects')
+        .select('id')
+        .ilike('manager_id', `%${sid}%`)
+      ids = (legacy || []).map((p: any) => p.id)
+    }
     setMyProjectIds(ids)
     return ids
   }, [])
@@ -168,12 +183,21 @@ export default function CalendarPage() {
     ;(async () => {
       const u = await loadUser()
       if (!u) return
-      await fetchEvents()
+
+      // buffer +- 10 days กันขอบเดือน/สัปดาห์
+      const rangeStart = startOfWeek(startOfMonth(currentMonth))
+      const rangeEnd = endOfWeek(endOfMonth(currentMonth))
+      const rangeStartISO = new Date(rangeStart.getTime() - 10 * 24 * 60 * 60 * 1000).toISOString()
+      const rangeEndISO = new Date(rangeEnd.getTime() + 10 * 24 * 60 * 60 * 1000).toISOString()
+
       const ids = await fetchMyProjects(u)
-      await fetchTaskEvents(ids)
+      await Promise.all([
+        fetchEvents(rangeStartISO, rangeEndISO),
+        fetchTaskEvents(ids, rangeStartISO, rangeEndISO),
+      ])
       setLoading(false)
     })()
-  }, [loadUser, fetchEvents, fetchMyProjects, fetchTaskEvents])
+  }, [loadUser, fetchEvents, fetchMyProjects, fetchTaskEvents, currentMonth])
 
   const handleUserUpdated = async () => {
     const u = await loadUser()
@@ -226,7 +250,12 @@ export default function CalendarPage() {
         if (error) throw error
       }
       setIsModalOpen(false); setEditId(null)
-      fetchEvents()
+      // รีโหลดเฉพาะช่วงเดือนที่กำลังดู (เร็วขึ้น)
+      const rangeStart = startOfWeek(startOfMonth(currentMonth))
+      const rangeEnd = endOfWeek(endOfMonth(currentMonth))
+      const rangeStartISO = new Date(rangeStart.getTime() - 10 * 24 * 60 * 60 * 1000).toISOString()
+      const rangeEndISO = new Date(rangeEnd.getTime() + 10 * 24 * 60 * 60 * 1000).toISOString()
+      fetchEvents(rangeStartISO, rangeEndISO)
     } catch (err: any) {
       alert('เกิดข้อผิดพลาด: ' + err.message)
     } finally {
@@ -238,7 +267,11 @@ export default function CalendarPage() {
     if (!confirm('ลบกิจกรรมนี้ใช่หรือไม่?')) return
     await supabase.from('events').delete().eq('id', id)
     setSelectedEvent(null)
-    fetchEvents()
+    const rangeStart = startOfWeek(startOfMonth(currentMonth))
+    const rangeEnd = endOfWeek(endOfMonth(currentMonth))
+    const rangeStartISO = new Date(rangeStart.getTime() - 10 * 24 * 60 * 60 * 1000).toISOString()
+    const rangeEndISO = new Date(rangeEnd.getTime() + 10 * 24 * 60 * 60 * 1000).toISOString()
+    fetchEvents(rangeStartISO, rangeEndISO)
   }
 
   const handleCsvFile = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -263,7 +296,11 @@ export default function CalendarPage() {
       const { error } = await supabase.from('events').insert(rows)
       if (error) throw error
       setIsCsvOpen(false); setCsvParsed(null); setCsvErrors([])
-      fetchEvents()
+      const rangeStart = startOfWeek(startOfMonth(currentMonth))
+      const rangeEnd = endOfWeek(endOfMonth(currentMonth))
+      const rangeStartISO = new Date(rangeStart.getTime() - 10 * 24 * 60 * 60 * 1000).toISOString()
+      const rangeEndISO = new Date(rangeEnd.getTime() + 10 * 24 * 60 * 60 * 1000).toISOString()
+      fetchEvents(rangeStartISO, rangeEndISO)
     } catch (err: any) {
       alert('นำเข้าไม่สำเร็จ: ' + err.message)
     } finally {
@@ -687,7 +724,11 @@ export default function CalendarPage() {
                       const newVal = !selectedEvent.is_pinned
                       await supabase.from('events').update({ is_pinned: newVal }).eq('id', selectedEvent.id)
                       setSelectedEvent({ ...selectedEvent, is_pinned: newVal })
-                      fetchEvents()
+                      const rangeStart = startOfWeek(startOfMonth(currentMonth))
+                      const rangeEnd = endOfWeek(endOfMonth(currentMonth))
+                      const rangeStartISO = new Date(rangeStart.getTime() - 10 * 24 * 60 * 60 * 1000).toISOString()
+                      const rangeEndISO = new Date(rangeEnd.getTime() + 10 * 24 * 60 * 60 * 1000).toISOString()
+                      fetchEvents(rangeStartISO, rangeEndISO)
                     }}
                       className={`flex items-center justify-center gap-1.5 px-3 py-3 rounded-xl font-bold transition text-sm shrink-0 ${selectedEvent.is_pinned ? 'bg-orange-100 text-orange-600 hover:bg-orange-200' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>
                       <Pin size={14} /> {selectedEvent.is_pinned ? 'ถอนหมุด' : 'ปักหมุด'}

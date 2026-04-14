@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
+import type { ProposalDoc } from '@/lib/proposal-schema'
 import { 
   ChevronDown, Sparkles, Download, Loader2, CheckCircle2, RotateCcw
 } from 'lucide-react'
@@ -46,6 +47,38 @@ export default function ProposalClient() {
   const [selectedSDGs, setSelectedSDGs] = useState<number[]>([])
   const [background, setBackground] = useState('')
   const [summary, setSummary] = useState('')
+  const [nameEn, setNameEn] = useState('')
+  const [academicYear, setAcademicYear] = useState(() => String(new Date().getFullYear() + 543)) // พ.ศ. โดยประมาณ
+  const [dateStart, setDateStart] = useState('')
+  const [dateEnd, setDateEnd] = useState('')
+  const [location, setLocation] = useState('')
+  const [projectCategory, setProjectCategory] = useState('')
+  const [graduateAttributes, setGraduateAttributes] = useState<string[]>([])
+  const [studentActivityGroup, setStudentActivityGroup] = useState('')
+  const [studentActivityType, setStudentActivityType] = useState('')
+  const [studentActivityHours, setStudentActivityHours] = useState<string>('')
+  const [holistic5h, setHolistic5h] = useState<string[]>([])
+
+  const [advisors, setAdvisors] = useState<Array<{ full_name: string; role_label?: string; department?: string }>>([])
+
+  const [sdgDetails, setSdgDetails] = useState<Record<number, { goal_text?: string; how_text?: string }>>({})
+  const [objectives, setObjectives] = useState<string[]>([])
+  const [kpis, setKpis] = useState<string[]>([])
+  const [participants, setParticipants] = useState<{ club?: string; sci?: string; staff?: string; public?: string }>({})
+
+  const [subActivities, setSubActivities] = useState<Array<{ title: string; detail?: string }>>([])
+  const [agenda, setAgenda] = useState<Array<{ date?: string; start_time?: string; end_time?: string; title: string }>>([])
+  const [workplan, setWorkplan] = useState<Array<{ date?: string; activity: string; owner?: string }>>([])
+
+  const [sustainable, setSustainable] = useState<Record<number, { checked: boolean; note?: string }>>({})
+  const [pdca, setPdca] = useState<{ plan: string; do: string; check: string; act: string }>({ plan: '', do: '', check: '', act: '' })
+
+  const [budgetRequested, setBudgetRequested] = useState<string>('')
+  const [budgetCategories, setBudgetCategories] = useState<Array<{ name: string; items: Array<{ name: string; quantity?: string; unit_price?: string; note?: string }> }>>([])
+  const [fundingSources, setFundingSources] = useState<Array<{ label: string; amount?: string }>>([])
+  const [budgetNote, setBudgetNote] = useState<string>('')
+  const [expectedResults, setExpectedResults] = useState<string[]>([])
+  const [evaluationMethods, setEvaluationMethods] = useState<string[]>([])
   
   const pdfRef = useRef<HTMLDivElement>(null)
 
@@ -60,10 +93,28 @@ export default function ProposalClient() {
         setUser(user)
 
         const [projectsRes, usersRes] = await Promise.all([
-          supabase.from('projects')
-            .select('*')
-            .ilike('manager_id', `%${user.user_metadata?.student_id}%`),
-          supabase.from('users').select('*')
+          (async () => {
+            const sid = user.user_metadata?.student_id
+            const { data: pm, error: pmErr } = await supabase
+              .from('project_managers')
+              .select('project_id')
+              .eq('student_id', sid)
+            let ids = (pm || []).map((r: any) => r.project_id)
+            if (pmErr) {
+              console.warn('project_managers unavailable, fallback to projects.manager_id', pmErr)
+              const { data: legacy } = await supabase
+                .from('projects')
+                .select('id')
+                .ilike('manager_id', `%${sid}%`)
+              ids = (legacy || []).map((p: any) => p.id)
+            }
+            if (!ids.length) return { data: [] as any[] }
+            return await supabase
+              .from('projects')
+              .select('id, name_th, manager_id')
+              .in('id', ids)
+          })(),
+          supabase.from('users').select('id, full_name, student_id, department, role, avatar_url')
         ])
         
         setProjects(projectsRes.data || [])
@@ -73,11 +124,39 @@ export default function ProposalClient() {
         const savedDraft = localStorage.getItem('samo_proposal_draft')
         if (savedDraft) {
           try {
-            const { projectId, sdgs, bg, summ } = JSON.parse(savedDraft)
+            const parsed = JSON.parse(savedDraft)
+            const { projectId, sdgs, bg, summ } = parsed
             setSelectedProjectId(projectId || '')
             setSelectedSDGs(sdgs || [])
             setBackground(bg || '')
             setSummary(summ || '')
+            setNameEn(parsed.nameEn || '')
+            setAcademicYear(parsed.academicYear || String(new Date().getFullYear() + 543))
+            setDateStart(parsed.dateStart || '')
+            setDateEnd(parsed.dateEnd || '')
+            setLocation(parsed.location || '')
+            setProjectCategory(parsed.projectCategory || '')
+            setGraduateAttributes(parsed.graduateAttributes || [])
+            setStudentActivityGroup(parsed.studentActivityGroup || '')
+            setStudentActivityType(parsed.studentActivityType || '')
+            setStudentActivityHours(parsed.studentActivityHours || '')
+            setHolistic5h(parsed.holistic5h || [])
+            setAdvisors(parsed.advisors || [])
+            setSdgDetails(parsed.sdgDetails || {})
+            setObjectives(parsed.objectives || [])
+            setKpis(parsed.kpis || [])
+            setParticipants(parsed.participants || {})
+            setSubActivities(parsed.subActivities || [])
+            setAgenda(parsed.agenda || [])
+            setWorkplan(parsed.workplan || [])
+            setSustainable(parsed.sustainable || {})
+            setPdca(parsed.pdca || { plan: '', do: '', check: '', act: '' })
+            setBudgetRequested(parsed.budgetRequested || '')
+            setBudgetCategories(parsed.budgetCategories || [])
+            setFundingSources(parsed.fundingSources || [])
+            setBudgetNote(parsed.budgetNote || '')
+            setExpectedResults(parsed.expectedResults || [])
+            setEvaluationMethods(parsed.evaluationMethods || [])
           } catch (e) {
             console.error("Error loading draft", e)
           }
@@ -98,11 +177,38 @@ export default function ProposalClient() {
         projectId: selectedProjectId,
         sdgs: selectedSDGs,
         bg: background,
-        summ: summary
+        summ: summary,
+        nameEn,
+        academicYear,
+        dateStart,
+        dateEnd,
+        location,
+        projectCategory,
+        graduateAttributes,
+        studentActivityGroup,
+        studentActivityType,
+        studentActivityHours,
+        holistic5h,
+        advisors,
+        sdgDetails,
+        objectives,
+        kpis,
+        participants,
+        subActivities,
+        agenda,
+        workplan,
+        sustainable,
+        pdca,
+        budgetRequested,
+        budgetCategories,
+        fundingSources,
+        budgetNote,
+        expectedResults,
+        evaluationMethods,
       }
       localStorage.setItem('samo_proposal_draft', JSON.stringify(draft))
     }
-  }, [selectedProjectId, selectedSDGs, background, summary, loading])
+  }, [selectedProjectId, selectedSDGs, background, summary, nameEn, academicYear, dateStart, dateEnd, location, projectCategory, graduateAttributes, studentActivityGroup, studentActivityType, studentActivityHours, holistic5h, advisors, sdgDetails, objectives, kpis, participants, subActivities, agenda, workplan, sustainable, pdca, budgetRequested, budgetCategories, fundingSources, budgetNote, expectedResults, evaluationMethods, loading])
 
   const toggleSDG = (id: number) => {
     setSelectedSDGs(prev => 
@@ -116,11 +222,120 @@ export default function ProposalClient() {
       setSelectedSDGs([])
       setBackground('')
       setSummary('')
+      setNameEn('')
+      setAcademicYear(String(new Date().getFullYear() + 543))
+      setDateStart('')
+      setDateEnd('')
+      setLocation('')
+      setProjectCategory('')
+      setGraduateAttributes([])
+      setStudentActivityGroup('')
+      setStudentActivityType('')
+      setStudentActivityHours('')
+      setHolistic5h([])
+      setAdvisors([])
+      setSdgDetails({})
+      setObjectives([])
+      setKpis([])
+      setParticipants({})
+      setSubActivities([])
+      setAgenda([])
+      setWorkplan([])
+      setSustainable({})
+      setPdca({ plan: '', do: '', check: '', act: '' })
+      setBudgetRequested('')
+      setBudgetCategories([])
+      setFundingSources([])
+      setBudgetNote('')
+      setExpectedResults([])
+      setEvaluationMethods([])
       localStorage.removeItem('samo_proposal_draft')
     }
   }
 
   const selectedProject = projects.find(p => p.id === selectedProjectId)
+
+  const proposalDoc: ProposalDoc = {
+    version: 1,
+    project_id: selectedProjectId || undefined,
+    cover: {
+      title_th: selectedProject?.name_th || 'ชื่อโครงการ (ภาษาไทย)',
+      title_en: nameEn || undefined,
+      academic_year: academicYear || undefined,
+      date_start: dateStart || undefined,
+      date_end: dateEnd || undefined,
+      buddhist_year: academicYear || undefined,
+      location: location || undefined,
+    },
+    classification: {
+      category: (projectCategory as any) || undefined,
+      graduate_attributes: graduateAttributes.length ? (graduateAttributes as any) : [],
+      student_activity_60up: studentActivityGroup
+        ? {
+            group: studentActivityGroup as any,
+            type_label: studentActivityType || undefined,
+            hours: studentActivityHours ? Number(studentActivityHours) : undefined,
+          }
+        : undefined,
+      holistic_5h: holistic5h.length ? (holistic5h as any) : [],
+    },
+    people: {
+      owners: [],
+      advisors: advisors.map(a => ({ full_name: a.full_name, role_label: a.role_label, department: a.department })),
+      president: allUsers.find((u: any) => u.department === 'นายกสโมสร')
+        ? {
+            full_name: allUsers.find((u: any) => u.department === 'นายกสโมสร')?.full_name,
+            student_id: allUsers.find((u: any) => u.department === 'นายกสโมสร')?.student_id,
+            department: 'นายกสโมสร',
+          }
+        : undefined,
+    },
+    rationale: background || undefined,
+    sdgs: selectedSDGs.map((id) => ({ sdg_id: id, goal_text: sdgDetails?.[id]?.goal_text, how_text: sdgDetails?.[id]?.how_text })),
+    objectives: objectives.filter(Boolean).map(text => ({ text })),
+    kpis: kpis.filter(Boolean).map(text => ({ text })),
+    participants: {
+      club_count: participants.club ? Number(participants.club) : undefined,
+      sci_students_count: participants.sci ? Number(participants.sci) : undefined,
+      staff_count: participants.staff ? Number(participants.staff) : undefined,
+      public_count: participants.public ? Number(participants.public) : undefined,
+    },
+    activities: {
+      sub_activities: subActivities.filter(a => a.title?.trim()).map(a => ({ title: a.title, detail: a.detail })),
+      agenda: agenda.filter(a => a.title?.trim()).map(a => ({ date: a.date, start_time: a.start_time, end_time: a.end_time, title: a.title })),
+      workplan: workplan.filter(w => w.activity?.trim()).map(w => ({ date: w.date, activity: w.activity, owner: w.owner })),
+    },
+    sustainable_guidelines: Array.from({ length: 25 }, (_, i) => i + 1).map((id) => ({
+      id: id as any,
+      checked: sustainable?.[id]?.checked || false,
+      note: sustainable?.[id]?.note || undefined,
+    })),
+    pdca: {
+      plan: pdca.plan || undefined,
+      do: pdca.do || undefined,
+      check: pdca.check || undefined,
+      act: pdca.act || undefined,
+    },
+    budget: {
+      requested_amount: budgetRequested ? Number(budgetRequested) : undefined,
+      categories: budgetCategories.map(c => ({
+        name: c.name,
+        items: c.items.filter(it => it.name?.trim()).map(it => ({
+          name: it.name,
+          quantity: it.quantity ? Number(it.quantity) : undefined,
+          unit_price: it.unit_price ? Number(it.unit_price) : undefined,
+          note: it.note || undefined,
+        })),
+      })),
+      funding_sources: fundingSources.filter(f => f.label?.trim()).map(f => ({
+        label: f.label,
+        amount: f.amount ? Number(f.amount) : undefined,
+      })),
+      note: budgetNote || undefined,
+    },
+    expected_results: expectedResults.filter(Boolean),
+    evaluation_methods: evaluationMethods.filter(Boolean),
+  }
 
   // 🚀 ฟังก์ชันดาวน์โหลด PDF
   const handleDownloadPDF = async () => {
@@ -171,30 +386,35 @@ export default function ProposalClient() {
       await (document as any).fonts?.ready;
       await new Promise(resolve => setTimeout(resolve, 800));
       
-      // 🚀 ถ่ายภาพด้วย html-to-image พร้อมเกราะป้องกัน CORS
-      const dataUrl = await htmlToImage.toPng(element, {
-        quality: 0.98,
-        backgroundColor: '#ffffff',
-        pixelRatio: 2, 
-        cacheBust: true,
-      });
-
       const pdf = new jsPDF({
         orientation: 'portrait',
         unit: 'mm',
-        format: 'a4'
+        format: 'a4',
+        compress: true,
       });
 
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const rect = element.getBoundingClientRect();
-      const sourceWidth = rect.width || element.offsetWidth;
-      const sourceHeight = rect.height || element.offsetHeight;
-      if (!sourceWidth || !sourceHeight) {
-        throw new Error('ไม่สามารถคำนวณขนาดหน้าเอกสารได้ (element มีขนาดเป็น 0)');
-      }
-      const pdfHeight = (sourceHeight * pdfWidth) / sourceWidth;
+      // ถ้าเป็นพรีวิวหลายหน้า ให้จับภาพทีละหน้า (กัน layout พัง/ตัดหน้าไม่ตรง)
+      const pages = Array.from(element.querySelectorAll('[data-pdf-page]')) as HTMLElement[];
+      const targets = pages.length ? pages : [element];
 
-      pdf.addImage(dataUrl, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+
+      for (let i = 0; i < targets.length; i++) {
+        const pageEl = targets[i];
+        const pageDataUrl = await htmlToImage.toJpeg(pageEl, {
+          quality: 0.92,
+          backgroundColor: '#ffffff',
+          // ลดขนาดไฟล์โดยยังคมชัด: 1.5–2 เป็นจุดสมดุล (A4)
+          pixelRatio: 1.6,
+          cacheBust: true,
+        });
+
+        if (i > 0) pdf.addPage();
+        // ใช้ JPEG + FAST compression จะลดไฟล์ลงมากโดยแทบไม่เสียคุณภาพตัวอักษร
+        pdf.addImage(pageDataUrl, 'JPEG', 0, 0, pdfWidth, pdfHeight, undefined, 'FAST');
+      }
+
       pdf.save(`Proposal_${selectedProject?.name_th || 'Document'}.pdf`);
       
     } catch (error: any) {
@@ -274,6 +494,54 @@ export default function ProposalClient() {
                   </div>
                 </div>
 
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-black uppercase tracking-widest text-gray-400 mb-2">ชื่อโครงการ (อังกฤษ)</label>
+                    <input
+                      value={nameEn}
+                      onChange={(e) => setNameEn(e.target.value)}
+                      placeholder="Project title (EN)"
+                      className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl text-sm font-semibold focus:ring-2 focus:ring-blue-500 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-black uppercase tracking-widest text-gray-400 mb-2">ปีการศึกษา (พ.ศ.)</label>
+                    <input
+                      value={academicYear}
+                      onChange={(e) => setAcademicYear(e.target.value)}
+                      placeholder="2569"
+                      className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl text-sm font-semibold focus:ring-2 focus:ring-blue-500 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-black uppercase tracking-widest text-gray-400 mb-2">เริ่มวันที่</label>
+                    <input
+                      type="date"
+                      value={dateStart}
+                      onChange={(e) => setDateStart(e.target.value)}
+                      className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl text-sm font-semibold focus:ring-2 focus:ring-blue-500 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-black uppercase tracking-widest text-gray-400 mb-2">ถึงวันที่</label>
+                    <input
+                      type="date"
+                      value={dateEnd}
+                      onChange={(e) => setDateEnd(e.target.value)}
+                      className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl text-sm font-semibold focus:ring-2 focus:ring-blue-500 outline-none"
+                    />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs font-black uppercase tracking-widest text-gray-400 mb-2">สถานที่</label>
+                    <input
+                      value={location}
+                      onChange={(e) => setLocation(e.target.value)}
+                      placeholder="ณ (สถานที่)"
+                      className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl text-sm font-semibold focus:ring-2 focus:ring-blue-500 outline-none"
+                    />
+                  </div>
+                </div>
+
                 <div>
                   <label className="block text-xs font-black uppercase tracking-widest text-gray-400 mb-3">SDGs ที่เกี่ยวข้อง (คลิกเพื่อเลือก)</label>
                   <div className="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-5 gap-3">
@@ -333,6 +601,94 @@ export default function ProposalClient() {
                   />
                 </div>
               </div>
+
+              <div className="bg-white p-6 rounded-3xl border border-gray-200 shadow-sm space-y-4">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-black uppercase tracking-widest text-gray-400">วัตถุประสงค์</label>
+                  <button
+                    type="button"
+                    onClick={() => setObjectives(prev => [...prev, ''])}
+                    className="text-xs font-bold text-blue-600 hover:underline"
+                  >
+                    + เพิ่มข้อ
+                  </button>
+                </div>
+                {(objectives.length ? objectives : ['']).map((v, idx) => (
+                  <input
+                    key={idx}
+                    value={objectives[idx] ?? ''}
+                    onChange={(e) => setObjectives(prev => prev.map((x, i) => i === idx ? e.target.value : x))}
+                    placeholder={`ข้อที่ ${idx + 1} เช่น เพื่อ...`}
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                  />
+                ))}
+              </div>
+
+              <div className="bg-white p-6 rounded-3xl border border-gray-200 shadow-sm space-y-4">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-black uppercase tracking-widest text-gray-400">ตัวชี้วัดความสำเร็จของโครงการ</label>
+                  <button
+                    type="button"
+                    onClick={() => setKpis(prev => [...prev, ''])}
+                    className="text-xs font-bold text-blue-600 hover:underline"
+                  >
+                    + เพิ่มข้อ
+                  </button>
+                </div>
+                {(kpis.length ? kpis : ['']).map((v, idx) => (
+                  <input
+                    key={idx}
+                    value={kpis[idx] ?? ''}
+                    onChange={(e) => setKpis(prev => prev.map((x, i) => i === idx ? e.target.value : x))}
+                    placeholder={`ข้อที่ ${idx + 1} เช่น นักศึกษาเข้าร่วมอย่างน้อย ... คน`}
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                  />
+                ))}
+              </div>
+
+              <div className="bg-white p-6 rounded-3xl border border-gray-200 shadow-sm space-y-4">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-black uppercase tracking-widest text-gray-400">วิธีการประเมินผล</label>
+                  <button
+                    type="button"
+                    onClick={() => setEvaluationMethods(prev => [...prev, ''])}
+                    className="text-xs font-bold text-blue-600 hover:underline"
+                  >
+                    + เพิ่มข้อ
+                  </button>
+                </div>
+                {(evaluationMethods.length ? evaluationMethods : ['']).map((v, idx) => (
+                  <input
+                    key={idx}
+                    value={evaluationMethods[idx] ?? ''}
+                    onChange={(e) => setEvaluationMethods(prev => prev.map((x, i) => i === idx ? e.target.value : x))}
+                    placeholder={`ข้อที่ ${idx + 1} เช่น แบบประเมินความพึงพอใจ`}
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                  />
+                ))}
+              </div>
+
+              <div className="bg-white p-6 rounded-3xl border border-gray-200 shadow-sm space-y-4">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-black uppercase tracking-widest text-gray-400">ผลที่คาดว่าจะได้รับ</label>
+                  <button
+                    type="button"
+                    onClick={() => setExpectedResults(prev => [...prev, ''])}
+                    className="text-xs font-bold text-blue-600 hover:underline"
+                  >
+                    + เพิ่มข้อ
+                  </button>
+                </div>
+                {(expectedResults.length ? expectedResults : ['']).map((v, idx) => (
+                  <input
+                    key={idx}
+                    value={expectedResults[idx] ?? ''}
+                    onChange={(e) => setExpectedResults(prev => prev.map((x, i) => i === idx ? e.target.value : x))}
+                    placeholder={`ข้อที่ ${idx + 1} เช่น ผู้เข้าร่วมได้รับความรู้/ทักษะ...`}
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                  />
+                ))}
+              </div>
             </div>
 
             <div className="hidden lg:block">
@@ -344,7 +700,8 @@ export default function ProposalClient() {
                         allUsers={allUsers}
                         sdgs={selectedSDGs} 
                         background={background} 
-                        summary={summary} 
+                        summary={summary}
+                        doc={proposalDoc}
                      />
                   </div>
                </div>
@@ -364,7 +721,8 @@ export default function ProposalClient() {
               allUsers={allUsers}
               sdgs={selectedSDGs} 
               background={background} 
-              summary={summary} 
+              summary={summary}
+              doc={proposalDoc}
             />
           </div>
         </div>
@@ -379,7 +737,15 @@ export default function ProposalClient() {
 }
 
 // ─── Sub-Component: The A4 Project Sheet ──────────────────────────────────────
-function ProjectSheet({ project, allUsers, sdgs, background, summary }: any) {
+function ProjectSheet({ project, allUsers, sdgs, background, summary, doc }: any) {
+  const typedDoc: ProposalDoc | undefined = doc
+  const cover = typedDoc?.cover
+  const objectives = typedDoc?.objectives || []
+  const kpis = typedDoc?.kpis || []
+  const expected = typedDoc?.expected_results || []
+  const evalMethods = typedDoc?.evaluation_methods || []
+  const coverDateStart = cover?.date_start
+  const coverDateEnd = cover?.date_end
   
   const managerIds = project?.manager_id ? project.manager_id.split(',').map((id:string) => id.trim()) : [];
   const president = allUsers.find((u:any) => u.department === 'นายกสโมสร');
@@ -399,100 +765,194 @@ function ProjectSheet({ project, allUsers, sdgs, background, summary }: any) {
     borderLight: { borderColor: '#D1D5DB' }
   };
 
-  return (
-    <div className="font-sans leading-relaxed flex flex-col min-h-full bg-white" style={safeStyles.textColor}>
-      <div className="flex justify-center mb-8">
-        <div 
-          className="border-2 px-6 py-2 rounded-full font-black text-sm uppercase tracking-widest"
-          style={safeStyles.borderGray}
-        >
-          Samo Project Proposal
+  const formatThaiBuddhistDate = (iso?: string) => {
+    if (!iso) return ''
+    const d = new Date(`${iso}T00:00:00`)
+    if (Number.isNaN(d.getTime())) return iso
+    const fmt = new Intl.DateTimeFormat('th-TH-u-ca-buddhist', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    })
+    const parts = fmt.formatToParts(d)
+    const day = parts.find(p => p.type === 'day')?.value
+    const month = parts.find(p => p.type === 'month')?.value
+    const year = parts.find(p => p.type === 'year')?.value
+    if (!day || !month || !year) return fmt.format(d)
+    return `${day} ${month} พ.ศ. ${year}`
+  }
+
+  const bodyTextClass = (text: string) => {
+    const n = (text || '').trim().length
+    if (n > 1350) return 'text-[12px] leading-[1.65]'
+    if (n > 1050) return 'text-[13px] leading-[1.65]'
+    return 'text-sm leading-[1.7]'
+  }
+
+  const A4 = ({ children, pageNumber }: { children: any; pageNumber: number }) => (
+    <div
+      className="bg-white text-gray-900"
+      data-pdf-page
+      style={{
+        width: '794px',
+        minHeight: '1123px',
+        padding: '60px',
+        boxSizing: 'border-box',
+        pageBreakAfter: 'always',
+      }}
+    >
+      <div className="font-sans leading-relaxed flex flex-col min-h-full" style={safeStyles.textColor}>
+        {children}
+        <div className="mt-auto pt-6">
+          <p className="text-[8px] text-center" style={safeStyles.textMuted}>
+            หน้า {pageNumber}
+          </p>
         </div>
       </div>
+    </div>
+  )
 
-      <h1 className="text-3xl font-black text-center mb-4 leading-tight">
-        {project?.name_th || 'ชื่อโครงการของคุณ'}
-      </h1>
-      
-      <div className="w-20 h-1.5 mx-auto mb-10 rounded-full" style={safeStyles.bgBlue} />
-
-      <div className="mb-10">
-        <p className="text-[10px] font-black uppercase tracking-widest text-center mb-4" style={safeStyles.textMuted}>
-          SDGs Contribution
-        </p>
-        <div className="flex flex-wrap justify-center gap-4">
-          {sdgs.length === 0 ? (
-             <div className="italic text-xs" style={safeStyles.textMuted}>ไม่ได้เลือก SDGs</div>
-          ) : (
-            sdgs.sort((a:number, b:number) => a - b).map((id: number) => {
-              const sdg = SDGS.find(s => s.id === id)
-              return (
-                <div key={id} className="flex flex-col items-center gap-1.5 w-14">
-                   <div className="w-14 h-14 rounded-lg overflow-hidden shadow-sm border border-gray-100">
-                     <img 
-                       src={getSdgImageUrl(id)} 
-                       alt={sdg?.name} 
-                       className="w-full h-full object-cover"
-                     />
-                   </div>
-                </div>
-              )
-            })
-          )}
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 gap-8 flex-1">
-        <section>
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-7 h-7 rounded-full text-white flex items-center justify-center text-xs font-bold" style={safeStyles.bgGray}>1</div>
-            <h3 className="font-black text-lg">ที่มาและความสำคัญ</h3>
-          </div>
-          <div className="pl-10 pr-2 text-sm whitespace-pre-wrap leading-relaxed text-justify break-words">
-            {background || 'เนื้อหาในส่วนที่มาและความสำคัญจะแสดงตรงนี้...'}
-          </div>
-        </section>
-
-        <section>
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-7 h-7 rounded-full text-white flex items-center justify-center text-xs font-bold" style={safeStyles.bgGray}>2</div>
-            <h3 className="font-black text-lg">บทสรุปโครงการ</h3>
-          </div>
-          <div className="pl-10 pr-2 text-sm whitespace-pre-wrap leading-relaxed text-justify break-words">
-            {summary || 'เนื้อหาในส่วนบทสรุปโครงการจะแสดงตรงนี้...'}
-          </div>
-        </section>
-      </div>
-
-      <div className="mt-16 pt-8 border-t flex flex-col gap-8" style={safeStyles.borderLight}>
-         <div className="flex flex-wrap justify-center gap-x-8 gap-y-10">
-            {projectManagers.length > 0 ? projectManagers.map((mgr: any) => (
-               <div key={mgr.student_id} className="text-center w-40">
-                 <div className="w-full border-b mb-2" style={safeStyles.borderLight} />
-                 <p className="font-bold text-xs">({mgr.full_name || mgr.student_id})</p>
-                 <p className="text-[9px] mt-1 uppercase tracking-widest font-bold" style={safeStyles.textMuted}>ผู้รับผิดชอบโครงการ</p>
-               </div>
-            )) : !isPresidentAlsoManager ? (
-               <div className="text-center w-40">
-                 <div className="w-full border-b mb-2" style={safeStyles.borderLight} />
-                 <p className="font-bold text-xs">(...........................................)</p>
-                 <p className="text-[9px] mt-1 uppercase tracking-widest font-bold" style={safeStyles.textMuted}>ผู้รับผิดชอบโครงการ</p>
-               </div>
-            ) : null}
-         </div>
-
-         {president && (
-            <div className="flex justify-center mt-2">
-               <div className="text-center w-48">
-                 <div className="w-full border-b mb-2" style={safeStyles.borderLight} />
-                 <p className="font-bold text-xs">({president.full_name || president.student_id})</p>
-                 <p className="text-[9px] mt-1 uppercase tracking-widest font-bold" style={safeStyles.textMuted}>นายกสโมสรนักศึกษาคณะวิทยาศาสตร์</p>
-               </div>
+  const SDGBadges = () => (
+    <div className="flex flex-wrap justify-center gap-4">
+      {sdgs.length === 0 ? (
+        <div className="italic text-xs" style={safeStyles.textMuted}>ไม่ได้เลือก SDGs</div>
+      ) : (
+        sdgs.sort((a:number, b:number) => a - b).map((id: number) => {
+          const sdg = SDGS.find(s => s.id === id)
+          return (
+            <div key={id} className="flex flex-col items-center gap-1.5 w-14">
+              <div className="w-14 h-14 rounded-lg overflow-hidden shadow-sm border border-gray-100">
+                <img src={getSdgImageUrl(id)} alt={sdg?.name} className="w-full h-full object-cover" />
+              </div>
             </div>
-         )}
-         
-         <p className="text-[8px] text-center mt-4" style={safeStyles.textMuted}>Generated by Samo Schedule (Beta)</p>
+          )
+        })
+      )}
+    </div>
+  )
+
+  const SignatureBlock = () => (
+    <div className="mt-10 pt-8 border-t flex flex-col gap-8" style={safeStyles.borderLight}>
+      <div className="flex flex-wrap justify-center gap-x-8 gap-y-10">
+        {projectManagers.length > 0 ? projectManagers.map((mgr: any) => (
+          <div key={mgr.student_id} className="text-center w-40">
+            <div className="w-full border-b mb-2" style={safeStyles.borderLight} />
+            <p className="font-bold text-xs">({mgr.full_name || mgr.student_id})</p>
+            <p className="text-[9px] mt-1 uppercase tracking-widest font-bold" style={safeStyles.textMuted}>ผู้รับผิดชอบโครงการ</p>
+          </div>
+        )) : !isPresidentAlsoManager ? (
+          <div className="text-center w-40">
+            <div className="w-full border-b mb-2" style={safeStyles.borderLight} />
+            <p className="font-bold text-xs">(...........................................)</p>
+            <p className="text-[9px] mt-1 uppercase tracking-widest font-bold" style={safeStyles.textMuted}>ผู้รับผิดชอบโครงการ</p>
+          </div>
+        ) : null}
       </div>
+
+      {president && (
+        <div className="flex justify-center mt-2">
+          <div className="text-center w-56">
+            <div className="w-full border-b mb-2" style={safeStyles.borderLight} />
+            <p className="font-bold text-xs">({president.full_name || president.student_id})</p>
+            <p className="text-[9px] mt-1 uppercase tracking-widest font-bold" style={safeStyles.textMuted}>
+              นายกสโมสรนักศึกษาคณะวิทยาศาสตร์
+            </p>
+            <p className="text-[8px] mt-1" style={safeStyles.textMuted}>
+              (ให้ประทับตราสโมสร ฯ ทับลายมือชื่อ)
+            </p>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+
+  return (
+    <div className="bg-white">
+      <A4 pageNumber={1}>
+        <div className="flex justify-center mb-6">
+          <div className="border-2 px-6 py-2 rounded-full font-black text-sm uppercase tracking-widest" style={safeStyles.borderGray}>
+            รูปแบบโครงการกิจกรรมนักศึกษา
+          </div>
+        </div>
+
+        <h1 className="text-3xl font-black text-center mb-3 leading-tight">
+          {cover?.title_th || project?.name_th || 'ชื่อโครงการ (ภาษาไทย)'}
+        </h1>
+        <p className="text-center text-sm font-semibold mb-4" style={safeStyles.textMuted}>
+          {cover?.title_en ? `(${cover.title_en})` : 'ชื่อโครงการ (ภาษาอังกฤษ)'}
+        </p>
+
+        <div className="flex justify-center mb-8">
+          <div className="text-[11px] font-bold text-gray-700 bg-gray-50 border border-gray-200 rounded-xl px-4 py-2">
+            ปีการศึกษา {cover?.academic_year || '..............'} · จัดกิจกรรมระหว่างวันที่ {formatThaiBuddhistDate(coverDateStart) || '..............'} – {formatThaiBuddhistDate(coverDateEnd) || '..............'} · ณ {cover?.location || '..............'}
+          </div>
+        </div>
+
+        <div className="mb-8">
+          <p className="text-[10px] font-black uppercase tracking-widest text-center mb-3" style={safeStyles.textMuted}>
+            SDGs
+          </p>
+          <SDGBadges />
+        </div>
+
+        <div className="grid grid-cols-1 gap-7">
+          <section>
+            <h3 className="font-black text-lg mb-2">หลักการและเหตุผล</h3>
+            <div className={`${bodyTextClass(background)} whitespace-pre-wrap break-words text-left`}>
+              {background || '...................................................................................................................'}
+            </div>
+          </section>
+
+          <section>
+            <h3 className="font-black text-lg mb-2">บทสรุปโครงการ</h3>
+            <div className={`${bodyTextClass(summary)} whitespace-pre-wrap break-words text-left`}>
+              {summary || '...................................................................................................................'}
+            </div>
+          </section>
+        </div>
+      </A4>
+
+      <A4 pageNumber={2}>
+        <h2 className="text-2xl font-black mb-6">วัตถุประสงค์ / ตัวชี้วัด / วิธีประเมินผล</h2>
+
+        <section className="mb-6">
+          <h3 className="font-black text-lg mb-2">วัตถุประสงค์</h3>
+          <ol className="list-decimal pl-6 space-y-1 text-sm">
+            {(objectives.length ? objectives : [{ text: 'เพื่อ..........................................................' }]).map((o: any, i: number) => (
+              <li key={i} className="break-words">{o.text}</li>
+            ))}
+          </ol>
+        </section>
+
+        <section className="mb-6">
+          <h3 className="font-black text-lg mb-2">ตัวชี้วัดความสำเร็จของโครงการ</h3>
+          <ol className="list-decimal pl-6 space-y-1 text-sm">
+            {(kpis.length ? kpis : [{ text: 'นักศึกษาเข้าร่วมโครงการ..................................อย่างน้อย ........ คน' }]).map((k: any, i: number) => (
+              <li key={i} className="break-words">{k.text}</li>
+            ))}
+          </ol>
+        </section>
+
+        <section className="mb-8">
+          <h3 className="font-black text-lg mb-2">วิธีการประเมินผล</h3>
+          <ul className="list-disc pl-6 space-y-1 text-sm">
+            {(evalMethods.length ? evalMethods : ['แบบประเมินความพึงพอใจ', 'นับจำนวนผู้เข้าร่วม']).map((t: string, i: number) => (
+              <li key={i} className="break-words">{t}</li>
+            ))}
+          </ul>
+        </section>
+
+        <section className="mb-6">
+          <h3 className="font-black text-lg mb-2">ผลที่คาดว่าจะได้รับ</h3>
+          <ol className="list-decimal pl-6 space-y-1 text-sm">
+            {(expected.length ? expected : ['.............................................................................']).map((t: string, i: number) => (
+              <li key={i} className="break-words">{t}</li>
+            ))}
+          </ol>
+        </section>
+
+        <SignatureBlock />
+      </A4>
     </div>
   )
 }
